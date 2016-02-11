@@ -26,7 +26,12 @@ SWITCH = 100
 detected_tags = 0
 feedback_mode = 0
 tko_x = tko_y = 0
-tko_z = 0.25
+tko_z = 0.6
+tko_yaw = 0
+
+MAX_FLY_RANGE = 8
+
+waypoint_x = waypoint_y = 0
 
 pos_fuse_x = pos_fuse_y = pos_fuse_z = 0
 odom_roll = odom_pitch = odom_yaw = 0
@@ -39,8 +44,6 @@ OUT = False
 TAG_TkO_X = -2.56
 TAG_TkO_Y = -0.08
 
-search_x = 1
-search_y = 0
 
 def callback_rc(rc):
     global SWITCH, KNOB_L, KNOB_R, BACK_ADJ
@@ -75,18 +78,21 @@ def callback_tag(tag):
     detected_tags = np.shape(tag.detections)[0]
 
 def callback_odom(odom):
-    global pos_fuse_x, pos_fuse_y,pos_fuse_z, odom_roll,odom_pitch,odom_yaw, tko_x, tko_y, InitTko
+    global pos_fuse_x, pos_fuse_y,pos_fuse_z, odom_roll,odom_pitch,odom_yaw, tko_x, tko_y, InitTko, tko_yaw
 
     pos_fuse_x = odom.pose.pose.position.x
     pos_fuse_y = odom.pose.pose.position.y
     pos_fuse_z = odom.pose.pose.position.z
+    qn_odom = [odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w]
+    (odom_roll,odom_pitch,odom_yaw) = euler_from_quaternion(qn_odom)
     #开机的时候，开关是在降落状态的
     if SWITCH == 1 and InitTko:
         tko_x = pos_fuse_x
         tko_y = pos_fuse_y
+        tko_yaw = odom_yaw
         InitTko = False
-    qn_odom = [odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w]
-    (odom_roll,odom_pitch,odom_yaw) = euler_from_quaternion(qn_odom)
+
+
     
 
 rospy.init_node('drone_info')
@@ -107,36 +113,94 @@ while not rospy.is_shutdown():
                 setpoint_x = tko_x
                 setpoint_y = tko_y
                 setpoint_z = tko_z
+                setpoint_yaw = tko_yaw
                 TAKEOFF_ENABLE = False
 
+
+
     if KNOB_R == 2:
+
         feedback_mode = 0
-        if setpoint_x >= search_x:
+        if waypoint_x >= MAX_FLY_RANGE:
             pass
         else:
-            setpoint_x = setpoint_x + 0.0009
-        setpoint_y = tko_y
-        setpoint_z = tko_z
+            waypoint_x = waypoint_x + 0.005
+        waypoint_y = 0
+
+        OUT = True
+        #Trans to init yaw direction
+        waypoint = np.array([waypoint_x, waypoint_y]).reshape(2, 1)
+        R_z_yaw = np.array([[np.cos(tko_yaw), -np.sin(tko_yaw)],
+                            [np.sin(tko_yaw), np.cos(tko_yaw)]])
+        waypoint = np.dot(R_z_yaw, waypoint)
+
+        setpoint_x = waypoint[0][0] + tko_x
+        setpoint_y = waypoint[1][0] + tko_y
 
     elif KNOB_R == 1 :
         if OUT:
             feedback_mode = 0
-            # setpoint_x = pos_fuse_x
-            # setpoint_y = pos_fuse_y  
-            setpoint_z = tko_z
             OUT = False
     elif KNOB_R == 0 :
         feedback_mode = 0
-        setpoint_x = setpoint_x - 0.0006
-        setpoint_z = tko_z
 
+        if waypoint_x >= 0:
+            waypoint_x = waypoint_x - 0.005
+        else:
+            pass
+
+        waypoint_y = 0
+        OUT = True
+
+        #Trans to init yaw direction
+        waypoint = np.array([waypoint_x, waypoint_y]).reshape(2, 1)
+        R_z_yaw = np.array([[np.cos(tko_yaw), -np.sin(tko_yaw)],
+                            [np.sin(tko_yaw), np.cos(tko_yaw)]])
+
+        waypoint = np.dot(R_z_yaw, waypoint)
+
+        setpoint_x = waypoint[0][0] + tko_x
+        setpoint_y = waypoint[1][0] + tko_y
 
     if KNOB_L == 2:
-        pass
+        feedback_mode = 0
+        if waypoint_y >= MAX_FLY_RANGE:
+            pass
+        else:
+            waypoint_y = waypoint_y + 0.0009
+        waypoint_x = 0
+
+        OUT = True
+        #Trans to init yaw direction
+        waypoint = np.array([waypoint_x, waypoint_y]).reshape(2, 1)
+        R_z_yaw = np.array([[np.cos(tko_yaw), -np.sin(tko_yaw)],
+                            [np.sin(tko_yaw), np.cos(tko_yaw)]])
+        waypoint = np.dot(R_z_yaw, waypoint)
+
+        setpoint_x = waypoint[0][0] + tko_x
+        setpoint_y = waypoint[1][0] + tko_y
     elif KNOB_L == 1:
         pass
     elif KNOB_L == 0:
-        pass
+        feedback_mode = 0
+
+        if waypoint_y >= 0:
+            waypoint_y = waypoint_y - 0.0006
+        else:
+            pass
+
+        waypoint_x = 0
+        OUT = True
+
+        #Trans to init yaw direction
+        waypoint = np.array([waypoint_x, waypoint_y]).reshape(2, 1)
+        R_z_yaw = np.array([[np.cos(tko_yaw), -np.sin(tko_yaw)],
+                            [np.sin(tko_yaw), np.cos(tko_yaw)]])
+
+        waypoint = np.dot(R_z_yaw, waypoint)
+
+        setpoint_x = waypoint[0][0] + tko_x
+        setpoint_y = waypoint[1][0] + tko_y
 
 
     if BACK_ADJ == 1:
@@ -158,6 +222,6 @@ while not rospy.is_shutdown():
     pub_droneinfo.publish(dinfo)
 
 
-    print 'setpoint',setpoint_x,setpoint_y,setpoint_z
+    print 'set_x',setpoint_x,'set_y',setpoint_y,'set_z',setpoint_z,'way_x',waypoint_x,'way_y', waypoint_y, 'tko_yaw', tko_yaw
 
     rate.sleep()

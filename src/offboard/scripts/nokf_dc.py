@@ -110,11 +110,11 @@ def PIDinit():
     global  pid_x, pid_y, pid_z
 
     # 4.3KG  parameter
-    P_x = 0.6 
+    P_x = 0.7 
     I_x = 0.0
     D_x = 0.0
 
-    P_y = 0.6
+    P_y = 0.7
     I_y = 0.0 
     D_y = 0.00
 
@@ -327,9 +327,9 @@ def callback_odom(odom):
 
 def callback_rc(rc):
     global SWITCH, KNOB_L
-    if rc.channels[8] == 1065:
+    if rc.channels[6] >= 1900:
         SWITCH = 1
-    if rc.channels[8] == 1933:
+    else :
         SWITCH = 0
     if rc.channels[5] > 1065 and rc.channels[9] < 1355:
         KNOB_L = 0
@@ -453,9 +453,10 @@ while not rospy.is_shutdown():
     # output_z = 0.08
     # output_yaw = 0 
     # if SWITCH == 1:
-    #     output_yaw = -np.pi/2
+    #     output_y = 0.08
     # else:
-    #     output_yaw = 0
+    #     output_y = -0.08
+
     #近地点不控制
     if feedback_z < 0.05:
         output_x = 0.0

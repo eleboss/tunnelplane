@@ -97,7 +97,7 @@ t = np.arange(0, np.shape(x)[0])
 
 
 
-plt.figure(figsize=(8,8.5))
+plt.figure(figsize=(30,30.5))
 plt.subplot(811)
 plt.plot(t, roll[:])
 plt.ylabel("Roll (rad)") 
