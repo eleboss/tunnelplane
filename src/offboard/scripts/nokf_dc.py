@@ -325,7 +325,6 @@ def callback_odom(odom):
         # print 'roll',odom_roll,'pitch',odom_pitch,'yaw',odom_yaw
 
 
-
 def callback_rc(rc):
     global SWITCH, KNOB_L
     if rc.channels[8] == 1065:
