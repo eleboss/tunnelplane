@@ -1,0 +1,18 @@
+
+<launch>
+
+<!-- coornidate align system -->
+  <node pkg="offboard" type="pose_dog.py" name="pose_dog" output="screen"/>
+
+
+<!-- launch the vins -->
+  <include file="$(find vins_estimator)/launch/usbcamera.launch"/>
+
+
+
+
+
+</launch>
+
+
+

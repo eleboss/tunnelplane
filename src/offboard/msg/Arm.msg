@@ -1,0 +1,11 @@
+std_msgs/Header header
+float32 mode
+float32 emergency
+float32 grasp
+float32 theta1
+float32 theta2
+float32 theta3
+float32 theta4
+float32 ArmRoll
+float32 ClawRotation
+geometry_msgs/Pose dof2point

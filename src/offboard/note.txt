@@ -1,0 +1,40 @@
+#根据实际测量得出以下结果
+ENU 对应 - X+ EAST Y+ NORTH Z+ UP
+NED 对应 - X+ NORTH Y+ EAST Z+ DOWN
+在/mavros/local_position/odom中，速度和yaw的表示都是使用ENU的，因此yaw的0指向East也就是X+
+在mavlink中可以看到ALLTITUDE.yaw和local_position/velocity此时是在NED中进行表示的
+也就是说在ros中使用的是ENU，在pixhawk上使用的是NED。
+
+此外，/mavros/setpoint_raw/local中的速度控制也是在ENU下的，也就是Z给正速度会起飞
+
+因此在ros上使用速度控制的时候，直接使用ENU坐标系，不管是位置还是速度都是ENU，剩下的交给MAVROS处理就好来。
+
+
+
+
+
+EKF2_AID_MASK中虽然说不是在NED下的EV要打勾，但是我在ROS用ENU，到pixhawk上的时候就自动钻换成NED了，因此不需要打勾
+EV_DELAY这个还是要根据真正的延迟来进行设置，不然会有震荡，可以适当减小保证震荡不大
+EV_POS X Y Z根据标定参数来设置就好了，应该是cam0 to imu0
+
+EKF2——RNG——A——HMAX管的是在什么时候激光雷达数据会失效，如果设置太小可能会在运动速度较大的时候自动切换到气压计数据，导致高度反馈失效
+EKF2-RNG-DELAY根据网上的大佬测的是30ms我就不测了。
+EKF_2TERR_NOISE是关键参数，代表对激光雷达观测的置信度，如果给高了就会发生震荡，这里给了0.6，效果感觉还行就不突破官方的限制了
+
+
+apriltag坐标系系统描诉,以tag为坐标原点，xyz自己估计
+
+
+This section shows how to setup the system with the proper reference frames. There are various representations but we will use two of them: ENU and NED.
+
+    ENU has a ground-fixed frame where x axis points East, y points North and z up. Robot frame is x towards the front, z up and y accordingly.
+
+    NED has x towards North, y East and z down. Robot frame is x towards the front, z down and y accordingly.
+
+Frames are shown in the image below: NED on the left while ENU on the right.
+
+ //Instruction of realsense coordinate
+  //Each stream of images provided by this SDK is also associated with a separate 3D coordinate space, specified in meters, with the coordinate [0,0,0] 
+  //referring to the center of the physical imager. Within this space, the positive x-axis points to the right, the positive y-axis points down, and the 
+  //positive z-axis points forward. Coordinates within this space are referred to as "points", and are used to describe locations within 3D space that 
+  //might be visible within a particular image.

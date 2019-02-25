@@ -1,0 +1,455 @@
+#!/usr/bin/python2.7
+# coding=<encoding name> 例如，可添加# coding=utf-8
+
+import rospy 
+import roslib
+import PID
+import time
+import tf
+import numpy as np
+from apriltags.msg import AprilTagDetections
+from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import TwistStamped
+from mavros_msgs.msg import PositionTarget, AttitudeTarget, State, RCIn
+from geometry_msgs.msg import TransformStamped, PoseStamped, Point, PointStamped, Vector3, Vector3Stamped, TwistStamped, QuaternionStamped
+from tf.transformations import quaternion_from_euler, euler_from_quaternion
+
+set_z= 0
+SWITCH = 2 #定义的额外开关
+feedback_x = feedback_y = feedback_z = feedback_vz = feedback_yaw =  0.0
+last_feedback_yaw = 0
+
+Z_FEEDBACK_AVALIABLE = 0
+XY_FEEDBACK_AVALIABLE = 0
+
+current_state = State()
+jump_height = 0
+TKO_SPEED = 0.8
+TOP_THRESH = 0.7
+BOTTOM_THRESH = 0.1
+REACH_TOP = False
+JUMP_INIT = True
+TAKEOFF_FINISH = False
+DRONE_MOVE_RANGE = 1 #无人机最大移动范围，VNIS的估计不应该超过这个值
+
+output_yaw = 0
+InitOdom = True
+odom_roll = odom_pitch = odom_yaw = 0
+init_odom_roll = init_odom_pitch = init_odom_yaw = 0
+local_linear_x = local_linear_y = local_linear_z = 0
+
+incremental_pos_x = incremental_pos_y = incremental_pos_z = 0
+tag_lost_counter = 0
+tag_x = tag_y = tag_z = tag_yaw = 0
+TAG_AVALIABLE = False
+tag_pos_fuse_x = tag_pos_fuse_y = 0
+
+ground_depth = -1 #初始化成-1代表无效值
+depth_init = 0
+tag_seq = last_tag_seq = 0
+odom_last_time = 0
+tag_time  = 0
+pos_fuse_x = pos_fuse_y = pos_fuse_z = 0
+body_pos_fuse_x = body_pos_fuse_y = 0
+
+
+def PIDinit():
+    global  pid_x, pid_y, pid_z, pid_vx, pid_vy, pid_vz, pid_yaw
+
+    P_vx = 2.0
+    I_vx = 0.0
+    D_vx = 0.0
+
+    P_x = 0.1 
+    I_x = 1.0 
+    D_x = 0.0
+
+    P_vy = 3.0
+    I_vy = 0.0
+    D_vy = 0.0
+
+    P_y = 1.8
+    I_y = 0.0 
+    D_y = 0.1
+
+    P_vz = 2.8
+    I_vz = 0.00
+    D_vz = 0.020
+
+    # P_z = 0.19
+    P_z = 0.064
+    I_z = 0.0
+    D_z = 0.012
+
+    P_yaw = 1.2
+    I_yaw = 0.0
+    D_yaw = 0.0
+
+    pid_x = PID.PID(P_x, I_x, D_x)
+    pid_y = PID.PID(P_y, I_y, D_y)
+    pid_z = PID.PID(P_z, I_z, D_z)
+    pid_vx = PID.PID(P_vx, I_vx, D_vx)
+    pid_vy = PID.PID(P_vy, I_vy, D_vy)
+    pid_vz = PID.PID(P_vz, I_vz, D_vz)
+    pid_yaw = PID.PID(P_yaw, I_yaw, D_yaw)
+
+    #控制频率根据不同的node的速率来设定，ukf和odom的反馈都能达到200HZ，但是PID控制周期是依据OFFBOARD刷新频率确定的也就是100HZ
+    pid_x.setSampleTime(0.01)
+    pid_vx.setSampleTime(0.01)
+    pid_y.setSampleTime(0.01)
+    pid_vx.setSampleTime(0.01)
+    pid_z.setSampleTime(0.01)
+    pid_vz.setSampleTime(0.01)
+    pid_yaw.setSampleTime(0.01)
+
+#apriltag的检测结果是按照相机为坐标系原点来检测的，结算的是目标板在相机的坐标系下的位置
+def callback_tag(tag):
+    global tag_lost_counter, tag_yaw, tag_x, tag_y, tag_z, tag_seq, tag_time
+    tag_time = tag.header.stamp.secs + tag.header.stamp.nsecs * 10**-9
+    detected_tags = np.shape(tag.detections)[0]
+    tag_seq = tag.header.seq
+    if detected_tags == 1:
+        tag_lost_counter = 0
+        tag_x = tag.detections[0].pose.position.x
+        tag_y = tag.detections[0].pose.position.y
+        tag_z = tag.detections[0].pose.position.z
+        tag_qn = [tag.detections[0].pose.orientation.x, tag.detections[0].pose.orientation.y, tag.detections[0].pose.orientation.z, tag.detections[0].pose.orientation.w]
+        (tag_roll,tag_pitch,tag_yaw) = euler_from_quaternion(tag_qn)
+
+
+    elif np.shape(tag.detections)[0] > 1:
+        for i in tag.detections:
+            #多个id支取id0作为基准
+            if i.id == 0:
+                tag_lost_counter = 0
+                tag_x = i.pose.position.x
+                tag_y = i.pose.position.y
+                tag_z = i.pose.position.z
+                tag_qn = [i.pose.orientation.x, i.pose.orientation.y, i.pose.orientation.z, i.pose.orientation.w]
+                (tag_roll,tag_pitch,tag_yaw) = euler_from_quaternion(tag_qn)    
+                continue
+    #id丢失，计数器加1
+    else:
+        tag_lost_counter  = tag_lost_counter + 1
+        if tag_lost_counter > 1000:
+            tag_lost_counter = 1000 
+
+    
+    # print 'x',tag_x, 'y',tag_y, 'z',tag_z    
+    # print 'lost_counter:',tag_lost_counter, 'tag_yaw',tag_yaw,'odom_yaw',odom_yaw
+
+
+def callback_odom(odom):
+    global odom_roll,odom_pitch,odom_yaw, InitOdom, init_odom_roll, init_odom_pitch, init_odom_yaw,last_tag_seq, tag_seq,odom_last_time
+    global tag_x, tag_y, tag_z, ground_depth , pos_fuse_x, pos_fuse_y, pos_fuse_z, tag_time, incremental_pos_x, incremental_pos_y, incremental_pos_z
+    global TKO_SPEED, TOP_THRESH, BOTTOM_THRESH, JUMP_INIT, jump_height, current_state, REACH_TOP, Z_FEEDBACK_AVALIABLE, XY_FEEDBACK_AVALIABLE
+    global TAG_AVALIABLE, tag_pos_fuse_x, tag_pos_fuse_y, depth_init, body_pos_fuse_x, body_pos_fuse_y,TAKEOFF_FINISH, local_linear_x, local_linear_y, local_linear_z
+    if InitOdom:
+        odom_last_time = odom.header.stamp.secs + odom.header.stamp.nsecs * 10**-9
+        qn_odom = [odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w]
+        (init_odom_roll, init_odom_pitch, init_odom_yaw) = euler_from_quaternion(qn_odom)
+        depth_init = odom.pose.pose.position.z
+        InitOdom = False
+    else:
+        odom_time = odom.header.stamp.secs + odom.header.stamp.nsecs * 10**-9
+        qn_odom = [odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w]
+        (odom_roll,odom_pitch,odom_yaw) = euler_from_quaternion(qn_odom)
+        
+        ground_depth = odom.pose.pose.position.z - depth_init
+        #print 'ground_depth',ground_depth,'depth_init',depth_init
+
+        # 减去初值
+        # 可能在不水平的地面上起飞，所以roll和pitch其实不应该减去初始值
+        # odom_roll = odom_roll - init_odom_roll
+        # odom_pitch = odom_pitch - init_odom_pitch
+        odom_yaw = odom_yaw - init_odom_yaw
+
+        # 区间限制
+        if odom_roll < -np.pi:
+            odom_roll = odom_roll + 2 * np.pi
+        if odom_roll > np.pi:
+            odom_roll = odom_roll - 2 * np.pi
+
+        if odom_pitch < -np.pi:
+            odom_pitch = odom_pitch + 2 * np.pi
+        if odom_pitch > np.pi:
+            odom_pitch = odom_pitch - 2 * np.pi
+
+        if odom_yaw < -np.pi:
+            odom_yaw = odom_yaw + 2 * np.pi
+        if odom_yaw > np.pi:
+            odom_yaw = odom_yaw - 2 * np.pi
+
+        # 求旋转矩阵
+        R_x = np.array([ [1, 0, 0], [0, np.cos(odom_roll), -np.sin(odom_roll)], [0, np.sin(odom_roll), np.cos(odom_roll)] ])   
+        R_y = np.array([ [np.cos(odom_pitch), 0, np.sin(odom_pitch)], [0, 1, 0], [-np.sin(odom_pitch), 0, np.cos(odom_pitch)]])   
+        R_z = np.array([ [np.cos(odom_yaw), -np.sin(odom_yaw), 0], [np.sin(odom_yaw), np.cos(odom_yaw), 0], [0, 0, 1]])   
+
+        # pixhawk速度坐标定义：箭头朝前为X+，机身水平超上为Z+，机身水平向左为Y+。速度是BODY frame,如果不做坐标变幻，那就一直在和pixhawk一致的坐标轴上
+        # 速度分解
+        #
+        ###########################
+        # 取反前速度坐标系
+        # ^  x+ （飞空控前箭头）
+        # 。
+        # 。
+        # 。
+        # 。
+        # 。
+        # Z+(水平向上))。。。。。。>  y-
+        ############################
+        body_linear_xyz = np.array([odom.twist.twist.linear.x, odom.twist.twist.linear.y, odom.twist.twist.linear.z]).reshape(3,1)
+        # body_linear_xyz = np.transpose(body_linear_xyz)
+
+        local_linear_xyz = np.dot(np.dot(np.dot(R_z, R_y), R_x),body_linear_xyz)
+
+        local_linear_x = local_linear_xyz[0][0]
+        local_linear_y = local_linear_xyz[1][0]
+        local_linear_z = local_linear_xyz[2][0]
+        
+        #相机的xy随yaw改变，所以这里就不对Z进行旋转了
+        #local_linear_xyz = np.dot(np.dot(R_y, R_x), body_linear_xyz)
+
+
+        dt = odom_time - odom_last_time
+        # TAG反馈处理
+        #TAG反馈插值补偿
+        if tag_seq - last_tag_seq == 0:
+            incremental_pos_x = incremental_pos_x + local_linear_xyz[0] * dt
+            tag_pos_fuse_x = tag_x + incremental_pos_x
+
+            incremental_pos_y = incremental_pos_y + local_linear_xyz[1] * dt
+            tag_pos_fuse_y = tag_y + incremental_pos_y 
+        else:
+            dt = odom_time - tag_time
+            incremental_pos_x = 0
+            incremental_pos_x = incremental_pos_x + local_linear_xyz[0] * dt 
+            tag_pos_fuse_x = tag_x + incremental_pos_x
+
+            incremental_pos_y = 0
+            incremental_pos_y = incremental_pos_y + local_linear_xyz[1] * dt
+            tag_pos_fuse_y = tag_y + incremental_pos_y
+
+        if tag_lost_counter == 0:
+            TAG_AVALIABLE = 1
+        else:
+            TAG_AVALIABLE = 0
+
+
+        # 处理XY融合结果，XY
+        pos_fuse_x = odom.pose.pose.position.x
+        pos_fuse_y = odom.pose.pose.position.y
+        
+        #用负yaw把在world世界坐标系的的位置反馈转到机身坐标系下，配合VX VY的输出坐标.
+        #这里注意最后是在哪个坐标系下控制，如果在local下就不需要转，在body下才要转
+        # R_z_2D = np.array([[np.cos(-odom_yaw), -np.sin(-odom_yaw)], [np.sin(-odom_yaw), np.cos(-odom_yaw)]]) 
+        # local_fuse_xy = np.array([pos_fuse_x, pos_fuse_y]).reshape(2,1)
+        # body_fuse_xy = np.dot(R_z_2D, local_fuse_xy)
+        # body_pos_fuse_x = body_fuse_xy[0]
+        # body_pos_fuse_y = body_fuse_xy[1]
+                   
+
+        # 位置反馈有效性判断VINS可能会炸飞，所以要小心
+        if  abs(pos_fuse_x) < DRONE_MOVE_RANGE and abs(pos_fuse_y) < DRONE_MOVE_RANGE:
+            XY_FEEDBACK_AVALIABLE = 1
+        else:
+            XY_FEEDBACK_AVALIABLE = 0
+
+
+
+        # Z反馈处理
+        #优先选用单点激光进行高度估计
+        if ground_depth > -0.5 and ground_depth < 6:
+            Z_FEEDBACK_AVALIABLE = 1
+            pos_fuse_z = ground_depth
+        #所有反馈全部丢失，直接用imu估计
+        else:
+            Z_FEEDBACK_AVALIABLE = 0
+            incremental_pos_z = incremental_pos_z + local_linear_xyz[2] * dt
+            pos_fuse_z = pos_fuse_z + incremental_pos_z
+
+        # print JUMP_INIT, current_state.mode, current_state.armed,REACH_TOP, local_linear_xyz[2], Z_FEEDBACK_AVALIABLE, jump_height,pos_fuse_z, Z_FEEDBACK_AVALIABLE
+        if JUMP_INIT and current_state.mode == 'OFFBOARD' and local_linear_xyz[2] > TKO_SPEED * TOP_THRESH:
+            REACH_TOP = True
+     
+        if REACH_TOP and JUMP_INIT and current_state.mode == 'OFFBOARD' and local_linear_xyz[2] < TKO_SPEED * BOTTOM_THRESH:
+            if Z_FEEDBACK_AVALIABLE != 0:
+                jump_height = pos_fuse_z
+                TAKEOFF_FINISH = True
+                JUMP_INIT = False
+
+
+
+        last_tag_seq = tag_seq
+        odom_last_time = odom_time
+
+        # print 'l_x:', body_linear_xyz[0],'l_y',body_linear_xyz[1], ';_z',body_linear_xyz[2]
+        # print 'g_x:', local_linear_xyz[0],'g_y',local_linear_xyz[1], 'g_z',local_linear_xyz[2]
+        # print 'roll',odom_roll,'pitch',odom_pitch,'yaw',odom_yaw
+
+
+
+def callback_rc(rc):
+    global SWITCH
+    if rc.channels[8] == 1065:
+        SWITCH = 1
+    if rc.channels[8] == 1933:
+        SWITCH = 0
+
+def callback_state(st):
+    global current_state
+    current_state = st
+rospy.init_node('drone_control')
+PIDinit()
+
+position_tag = rospy.Subscriber('apriltags/detections', AprilTagDetections, callback_tag, queue_size=1)
+rc_in = rospy.Subscriber('mavros/rc/in', RCIn, callback_rc, queue_size=1)
+sub_state = rospy.Subscriber('mavros/state', State, callback_state, queue_size=1)
+subodom = rospy.Subscriber('mavros/local_position/odom', Odometry, callback_odom)
+# subvins = rospy.Subscriber('vins_estimator/odometry', Odometry, callback_vins)
+# subdepth = rospy.Subscriber('depth', Odometry, callback_depth)
+#pub_position = rospy.Publisher('mavros/setpoint_position/local', PoseStamped, queue_size=1)
+#pub_velocity = rospy.Publisher('/mavros/setpoint_velocity/cmd_vel', TwistStamped, queue_size=1)
+position_pub = rospy.Publisher('mavros/setpoint_raw/local', PositionTarget, queue_size=1)
+#rospy.spin()
+
+
+rate = rospy.Rate(100)  
+while not rospy.is_shutdown():
+
+
+    vel_control = TwistStamped()
+    pos_control = PoseStamped()
+
+    # X 串级PID
+    pid_x.SetPoint = 0
+    feedback_x = pos_fuse_x
+    pid_x.update(feedback_x)
+    output_x = pid_x.output
+
+    # pid_vx.SetPoint = output_x
+    pid_vx.SetPoint = 0
+    feedback_vx = local_linear_x
+    pid_vx.update(feedback_vx)
+    output_vx = pid_vx.output
+
+    # Y 串级PID
+    pid_y.SetPoint = 0
+    feedback_y = pos_fuse_y
+    pid_y.update(feedback_y)
+    output_y = pid_y.output
+
+    # pid_vy.SetPoint = output_y
+    pid_vy.SetPoint = 0
+    feedback_vy = local_linear_y
+    pid_vy.update(feedback_vy)
+    output_vy = pid_vy.output
+
+
+    # Z 串级PID 开关选择高度
+    if SWITCH == 1:
+        # pid_z.SetPoint = jump_height
+        pid_z.SetPoint = 0.3
+    else:
+        pid_z.SetPoint = 0
+
+    feedback_z = pos_fuse_z
+    pid_z.update(feedback_z)
+    output_z = pid_z.output 
+
+    pid_vz.SetPoint = output_z
+    feedback_vz = local_linear_z    
+    pid_vz.update(feedback_vz)
+    output_vz = pid_vz.output 
+
+
+   
+    feedback_yaw = odom_yaw
+    if feedback_yaw - last_feedback_yaw != 0: 
+        pid_yaw.update(feedback_yaw)
+        output_yaw = pid_yaw.output
+        pid_yaw.SetPoint = tag_yaw
+
+        #print  " yaw_set:", pid_yaw.SetPoint," yaw_out:", output_yaw, " yaw_Feb:", feedback_yaw, "dfb:",abs(feedback_yaw) - abs(last_feedback_yaw)
+
+
+    #用速度限制防止无人机突然起降导致的不稳定
+    # if output_vx > 0.6:
+    #     output_vx = 0.6
+    # elif output_vx < -0.6:
+    #     output_vx = -0.6
+
+    # if output_vy > 0.6:
+    #     output_vy = 0.6
+    # elif output_vy < -0.6:
+    #     output_vy = -0.6
+
+    if output_vz > 0.6:
+        output_vz = 0.6
+    elif output_vz < -0.6:
+        output_vz = -0.6
+
+    #反馈失效的时候保持静止
+    if not Z_FEEDBACK_AVALIABLE:
+        output_vz = 0
+    if not XY_FEEDBACK_AVALIABLE:
+        output_vx = 0
+        output_vy = 0
+    #jump完成再开始控制
+    if TAKEOFF_FINISH != True:
+        output_vx = 0
+        output_vy = 0
+        output_vz = 0
+
+
+    stamp = rospy.get_rostime()
+    #暂时屏蔽yaw控制和y控制
+    raw_msg = PositionTarget(coordinate_frame=PositionTarget.FRAME_LOCAL_NED,
+                             type_mask=
+                                       PositionTarget.IGNORE_PX + PositionTarget.IGNORE_PY +  PositionTarget.IGNORE_PZ +
+                                       PositionTarget.IGNORE_AFX + PositionTarget.IGNORE_AFY + PositionTarget.IGNORE_AFZ +
+                                       PositionTarget.IGNORE_YAW  + PositionTarget.FORCE,
+                             #加不加初始角还不确定，加初始角容易出现固定偏差，减去pi/2是因为会发生偏转
+                             yaw = 0)
+    raw_msg.header.stamp = stamp
+
+    output_vx = 0.02
+    output_vy = 0.05
+    output_vz = 0
+    #自由落体测试，整定速度PID专用MPC_Z_VEL_*
+    if feedback_z > 0.25:
+        set_z = 1
+    if set_z:
+        output_z = -0.02
+    raw_msg.velocity.x = output_vx
+    raw_msg.velocity.y = output_vy                             
+    raw_msg.velocity.z = output_z
+
+
+    position_pub.publish(raw_msg)
+
+
+    # #vel_control.twist.linear.x = 0
+    # vel_control.twist.linear.y = output_y
+    # vel_control.twist.linear.z = output_z
+    # #vel_control.twist.angular.z = 0
+    # pub_velocity.publish(vel_control)
+
+    # (x,y,z,w) = quaternion_from_euler(odom_roll, odom_pitch, feedback_yaw + output_yaw)
+    # pos_control.pose.orientation.x = x
+    # pos_control.pose.orientation.y = y
+    # pos_control.pose.orientation.z = z
+    # pos_control.pose.orientation.w = w
+    # #pub_position.publish(pos_control)
+
+    #outter loop
+    # print  "x_set:", pid_x.SetPoint, "x_out:", output_x, "x_Feb:", feedback_x  
+    # print  "y_set:", pid_y.SetPoint, "y_out:", output_y, "y_Feb:", feedback_y
+    # print  "z_set:", pid_z.SetPoint, "z_out:", output_z, "z_Feb:", feedback_z,'jump',jump_height 
+    #inner loop
+    print  "vx_set:", pid_vx.SetPoint, "vx_out:", output_vx, "vx_Feb:", feedback_vx  
+    print  "vy_set:", pid_vy.SetPoint, "vy_out:", output_vy, "vy_Feb:", feedback_vy
+    # print  "vz_set:", pid_vz.SetPoint, "vz_out:", output_vz, "z_Feb:", feedback_vz,'jump',jump_height 
+
+    rate.sleep()

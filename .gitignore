@@ -1,0 +1,7 @@
+devel
+build
+.vscode
+data/
+logs/
+data/
+.pyc

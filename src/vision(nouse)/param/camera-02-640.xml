@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<opencv_storage>
+<calibration_Time>""</calibration_Time>
+<nrOfFrames>20</nrOfFrames>
+<image_Width>640</image_Width>
+<image_Height>480</image_Height>
+<board_Width>14</board_Width>
+<board_Height>9</board_Height>
+<square_Size>22.</square_Size>
+<FixAspectRatio>1.</FixAspectRatio>
+<!-- flags:  +fix_aspectRatio +zero_tangent_dist -->
+<flagValue>10</flagValue>
+<Camera_Matrix type_id="opencv-matrix">
+  <rows>3</rows>
+  <cols>3</cols>
+  <dt>d</dt>
+  <data>
+  498.5121 0.000000 341.0656 0.000000 499.7970 232.3922 0.000000 0.000000 1.000000</data></Camera_Matrix>
+<Distortion_Coefficients type_id="opencv-matrix">
+  <rows>5</rows>
+  <cols>1</cols>
+  <dt>d</dt>
+  <data>
+  0.038318 -0.097820 -0.001353 0.002234 0.000000</data></Distortion_Coefficients>
+</opencv_storage>

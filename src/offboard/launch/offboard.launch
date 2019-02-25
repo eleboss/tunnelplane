@@ -1,0 +1,6 @@
+<launch>
+  <node pkg="offboard" type="offboard_node" name="offboard" output="screen" />
+  <node pkg="offboard" type="fly_ex4.py" name="fly_node" output="screen" />
+  
+
+</launch>

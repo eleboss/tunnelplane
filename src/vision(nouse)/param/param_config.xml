@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<opencv_storage>
+<!--Parameter for Debug-->
+
+
+<show_image>0</show_image>
+
+
+<!--Parameter for Armor Detection System-->
+<min_light_gray>200</min_light_gray>
+<min_light_height>3</min_light_height>
+<min_light_width>0.8</min_light_width>
+<min_light_ratio>1.2</min_light_ratio>
+<color_threshold>30</color_threshold>
+<max_light_delta_w>280</max_light_delta_w>
+<min_light_delta_w>16</min_light_delta_w>
+<max_light_delta_angle>20</max_light_delta_angle>
+<br_threshold>40</br_threshold>
+
+<!--Parameter for Enemy Color, 0(default) means for red, otherwise blue-->
+<enemy_color>0</enemy_color>
+
+<!--Minimum / Maximun distance (cm) of detection-->
+<min_detect_distance>10.0</min_detect_distance>
+
+<max_detect_distance>800.0</max_detect_distance>
+
+
+<!--Parameter for Camera-->
+<exposure_time>10</exposure_time>
+<intrinsic_file_480>/home/ubuntu/Documents/whuRobot2/src/robo_vision/param/camera-02-640.xml</intrinsic_file_480>
+<intrinsic_file_720>/home/ubuntu/Documents/whuRobot2/src/robo_vision/param/camera-01-720.xml</intrinsic_file_720>
+
+<!--Bullet speed (m/s)-->
+<bullet_speed>22</bullet_speed>
+
+</opencv_storage>

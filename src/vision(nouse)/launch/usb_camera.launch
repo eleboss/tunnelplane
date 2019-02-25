@@ -1,0 +1,30 @@
+<launch>
+<node pkg="vision" type="read_camera" name="read_usbcamera" output="screen">
+    <param name="image_topic" value="/usbcamera/image_raw"/>
+    <param name="dev_name" value="/dev/video0"/>
+
+    <param name="image_width" value="640"/>
+    <param name="image_height" value="480"/>
+    <param name="exposure_time" value="200"/>
+    <param name="calibration" value="1"/>
+    <param name="stream_rate" value="5"/>
+
+    <!-- Intrinsic parameter -->
+    <param name="fx" value="1127.9"/>
+    <param name="fy" value="1126.9"/>
+    <param name="cx" value="684.4088"/>
+    <param name="cy" value="526.1169"/>
+
+    <!-- Radial Distortion -->
+    <param name="k1" value="-0.4066"/>
+    <param name="k2" value="0.1713"/>
+    <param name="k3" value="0"/>
+    
+    <!-- Tangential Distortion -->
+    <param name="t1" value="-0.002"/>
+    <param name="t2" value="-0.0023"/>
+
+</node>
+
+
+</launch>
