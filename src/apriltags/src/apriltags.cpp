@@ -499,7 +499,7 @@ void GetParameterValues()
 
     node_->param("viewer", viewer_, false);
     node_->param("publish_detections_image", publish_detections_image_, false);
-    node_->param("display_marker_overlay", display_marker_overlay_, false);
+    node_->param("display_marker_overlay", display_marker_overlay_, true);
     node_->param("display_marker_outline", display_marker_outline_, false);
     node_->param("display_marker_id", display_marker_id_, false);
     node_->param("display_marker_edges", display_marker_edges_, false);
