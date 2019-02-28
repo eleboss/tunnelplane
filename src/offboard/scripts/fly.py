@@ -17,7 +17,6 @@ from mavros_msgs.msg import PositionTarget, AttitudeTarget, State, RCIn
 from geometry_msgs.msg import TransformStamped, PoseStamped, Point, PointStamped, Vector3, Vector3Stamped, TwistStamped, QuaternionStamped
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 from offboard.msg import DroneInfo
-from offboard.msg import Arm
 
 setpoint_yaw = 0
 setpoint_x = setpoint_y = setpoint_z = 0
@@ -26,6 +25,7 @@ KNOB_L = KNOB_R = BACK_ADJ = 100
 SWITCH = 100
 detected_tags = 0
 feedback_mode = 1
+tko_x = tko_y = tko_z = 0
 
 pos_fuse_x = pos_fuse_y = pos_fuse_z = 0
 odom_roll = odom_pitch = odom_yaw = 0
@@ -33,60 +33,13 @@ InitTko = True
 search_direction = 1
 TAKEOFF_ENABLE = True
 
-claw_rotation = 0.0 
-
-
 OUT = False
-
-drop_x = drop_y = 0
-drop_z = 0.25
-grasp_x_bais = 0.35
-grasp_z_bais = -0.4 
-target_x = target_y = target_z = 0
-target_yaw_bais = 0
-Received_det = False
-Search = True
-
-dof2_x = dof2_y = 0
-dof3_x = dof3_y = 0
-grasp_x = 0.35 #末端抓取器的抓取点位置
-grasp_y = -0.4
-
-known_grasp_x = -1.6
-known_grasp_y = -0.05
-known_grasp_z = 0.25
 
 TAG_TkO_X = -2.56
 TAG_TkO_Y = -0.08
 
-
-DOF2_FLOD_X = 0.3237632768798173
-DOF2_FLOD_Y = -0.08149061946906042
-DOF2_GRASP_X = 0.274768
-DOF2_GRASP_Y = -0.43
-DOF2_FLYING_X = 0.3237632768798173
-DOF2_FLYING_Y = -0.08149061946906042
-DOF2_DROP_X = 0.274768
-DOF2_DROP_Y = -0.43
-
-L1 = 0.119
-L2 = 0.31
-# L3 = 0.31 #link2转轴到link3末端抓取点的位置
-# L3x = 0.307 #末端抓取点中心在link2坐标系下的表达
-# L3y = 0.039
-# L4x = 0.185 #相机位置在link2坐标系下的表达
-# L4y = 0.075
-theta1 = theta2 = theta3 = theta4 = 0
-arm_mode = 0
-arm_emergency = 0
-arm_grasp = 0
-
-set_dof2_x = 0.3
-set_dof2_y = -0.3
-
-tko_x = 0
-tko_y = 0 
-tko_z = 0.25
+search_x = 1
+search_y = 0
 
 def callback_rc(rc):
     global SWITCH, KNOB_L, KNOB_R, BACK_ADJ
@@ -134,202 +87,74 @@ def callback_odom(odom):
     qn_odom = [odom.pose.pose.orientation.x, odom.pose.pose.orientation.y, odom.pose.pose.orientation.z, odom.pose.pose.orientation.w]
     (odom_roll,odom_pitch,odom_yaw) = euler_from_quaternion(qn_odom)
     
-def callback_det(det):
-    global target_x, target_y, target_z, target_yaw_bais, Received_det
-    #相当于乘一个T
-    camera_target = np.array([det.pose.position.z, -det.pose.position.x, det.pose.position.y,1])
-
-    camera_target_enu = np.dot(RT.TENU0_matrix(odom_roll, odom_pitch, odom_yaw), camera_target)
-    target_x = camera_target_enu[0]
-    target_y = camera_target_enu[1]
-    target_z = camera_target_enu[2]
-    target_yaw_bais = np.arctan2(target_y,target_x)
-    # Received_det = True
-
-    # print 'camera',camera_target,'camera_target_enu',camera_target_enu
-    # print theta1,theta2,theta3,theta4,arm_roll
-
-def callback_arm(arm):
-    global theta1, theta2, theta3, theta4, arm_roll, arm_pitch, dof2_x, dof2_y, dof3_x, dof3_y
-    theta1 = arm.theta1/180.0*np.pi
-    theta2 = arm.theta2/180.0*np.pi
-    theta3 = arm.theta3/180.0*np.pi
-    theta4 = arm.theta4/180.0*np.pi
-    arm_roll = arm.ArmRoll/180.0*np.pi
-
-    dof2_x, dof2_y = RT.dof2_position(theta1,theta2,L1,L2)
-    # print theta1,theta2,dof2_x, dof2_y, L1,L2
-    # dof3_x, dof3_y = RT.dof3_position(theta1,theta2,L1,L2, L3x,L3y)
-
 
 rospy.init_node('drone_info')
 rc_in = rospy.Subscriber('mavros/rc/in', RCIn, callback_rc, queue_size=1)
 position_tag = rospy.Subscriber('apriltags/detections', AprilTagDetections, callback_tag, queue_size=1)
 subodom = rospy.Subscriber('mavros/local_position/odom', Odometry, callback_odom, queue_size=1)
-subarm = rospy.Subscriber('arm/theta', Arm, callback_arm)
-subdet = rospy.Subscriber('detection', PoseStamped, callback_det)
 
-pub_arm = rospy.Publisher('arm/control', Arm, queue_size=1)
-pub_balance = rospy.Publisher('arm/balance', Arm, queue_size=1)
 pub_droneinfo =  rospy.Publisher('drone_info', DroneInfo, queue_size=1)
 
 rate = rospy.Rate(100)
 while not rospy.is_shutdown():
     dinfo = DroneInfo()
 
-    arm = Arm()
-
     #Takeoff
     if SWITCH == 0:
         if (pos_fuse_z < tko_z):
             if TAKEOFF_ENABLE: 
-                setpoint_x = TAG_TkO_X
-                setpoint_y = TAG_TkO_Y
+                setpoint_x = tko_x
+                setpoint_y = tko_y
                 setpoint_z = tko_z
                 TAKEOFF_ENABLE = False
-                arm_mode = 1
 
-    #'SEARCH MODE -forward
-    # if (KNOB_R == 0 ):
-    #     arm_mode = 2
-    #     if(Received_det):
-    #         #正确解法
-    #         # setpoint_y = target_y + pos_fuse_y
-    #         # if setpoint_y - pos_fuse_y < 0.2:
-    #         #     setpoint_x = target_x + pos_fuse_x - grasp_x_bais
-    #         #     if setpoint_x - pos_fuse_x < 0.2:
-    #         #         setpoint_z = target_z - grasp_z_bais
-
-    #         setpoint_y = known_grasp_y
-    #         if abs(setpoint_y - pos_fuse_y) < 0.2:
-    #             setpoint_x = known_grasp_x
-    #             if abs(setpoint_x - pos_fuse_x) < 0.2:
-    #                 setpoint_z = known_grasp_z
-    #         #抵达目的地，开始抓取
-    #         if abs(known_grasp_x - pos_fuse_x) < 0.03 and abs(known_grasp_y - pos_fuse_y) < 0.03 and abs(known_grasp_z - pos_fuse_z) < 0.03:
-    #             # set_dof2_x,set_dof2_y = RT.T_GraspToDof2(grasp_x, grasp_y, L3x,L3y)
-    #             set_dof2_x = DOF2_GRASP_X
-    #             set_dof2_y = DOF2_GRASP_Y
-    #         if abs(dof2_x - set_dof2_x) < 0.02 and abs(dof2_y - set_dof2_y) < 0.02:
-    #             arm_grasp = 1
-    #             Received_det = False
-    #     Search = False
-    #     if Search:
-    #         setpoint_x = setpoint_x + 0.003 * search_direction
-    #         if abs(setpoint_x) > 2:
-    #             search_direction = -search_direction
-            # print setpoint_x,Search,search_direction
-
-    #HOLD MODE
-    # if KNOB_R == 1:
-    #     setpoint_x = pos_fuse_x
-    #     setpoint_y = pos_fuse_y
-    #DROPBACK MODE
-    # elif KNOB_R == 2:
-    #     arm_mode = 2
-    #     setpoint_y = drop_y
-    #     if abs(setpoint_y - pos_fuse_y) < 0.2:
-    #         setpoint_x = drop_x
-    #         if abs(setpoint_x - pos_fuse_x) < 0.2:
-    #             setpoint_z = drop_z
-    #     if abs(drop_x - pos_fuse_x) < 0.03 and abs(drop_y - pos_fuse_y) < 0.03 and abs(drop_z - pos_fuse_z) < 0.03:
-    #         set_dof2_x = DOF2_DROP_X
-    #         set_dof2_y = DOF2_DROP_Y
-    #     if abs(dof2_x - set_dof2_x) < 0.02 and abs(dof2_y - set_dof2_y) < 0.02:
-    #         arm_grasp = 0
     if KNOB_R == 2:
-        feedback_mode = 1
-
-        if setpoint_x >= known_grasp_x:
+        feedback_mode = 0
+        if setpoint_x >= search_x:
             pass
         else:
             setpoint_x = setpoint_x + 0.0009
-        setpoint_y = known_grasp_y
+        setpoint_y = tko_y
         setpoint_z = tko_z
-        OUT = True
+
     elif KNOB_R == 1 :
         if OUT:
-            feedback_mode = 1
+            feedback_mode = 0
             # setpoint_x = pos_fuse_x
             # setpoint_y = pos_fuse_y  
             setpoint_z = tko_z
             OUT = False
     elif KNOB_R == 0 :
-        feedback_mode = 1
+        feedback_mode = 0
         setpoint_x = setpoint_x - 0.0006
         setpoint_z = tko_z
-        OUT = True
+
+
     if KNOB_L == 2:
-        arm_grasp = 1
+        pass
     elif KNOB_L == 1:
-        arm_grasp = 0
+        pass
     elif KNOB_L == 0:
         pass
-    # print  arm_mode,KNOB_L
-        # arm_grasp = 0
-    # setpoint_x = target_x + pos_fuse_x - grasp_x_bais
-    # setpoint_y = target_y + pos_fuse_y
-    # setpoint_z = target_z - grasp_z_bais
 
-    # setpoint_yaw  = setpoint_yaw + target_yaw_bais
+
+    if BACK_ADJ == 1:
+        pass
+    else:
+        pass
 
     # LANDING
     if SWITCH == 1:
-        # set_dof2_x = DOF2_FLOD_X
-        # set_dof2_y = DOF2_FLOD_Y
-        # arm_mode = 1
-
-        #test
-        # set_dof2_x = DOF2_GRASP_X
-        # set_dof2_y = DOF2_GRASP_Y
-
-        # setpoint_y = tko_y
-        # if abs(setpoint_y - pos_fuse_y) < 0.2:
-        #     setpoint_x = tko_z
-        #     if abs(setpoint_x - pos_fuse_x) < 0.2:
-        #         setpoint_z = 0
         setpoint_z = 0
-            
-    #emergency!!!!        
-    if BACK_ADJ == 1:
-        # arm_emergency = 1
-
-        set_dof2_x = 0.40
-        set_dof2_y = -0.05
-        claw_rotation = 0
-        # if abs(dof2_x - set_dof2_x)<0.02 and abs(dof2_y - set_dof2_y)<0.02:
-        #     arm_grasp = 1 
-    else:
-        # arm_emergency = 0
-
-        set_dof2_x = 0.26
-        set_dof2_y = -0.08
-        claw_rotation = 0
-        # if abs(dof2_x - set_dof2_x)<0.02 and abs(dof2_y - set_dof2_y)<0.02:
-        #     arm_grasp = 0 
-
-    # set_dof2_x = 0.31
-    # set_dof2_y = -0.119
+                   
     dinfo.header.stamp = rospy.get_rostime()
     dinfo.setpoint.position.x = setpoint_x
     dinfo.setpoint.position.y = setpoint_y
     dinfo.setpoint.position.z = setpoint_z
     dinfo.setpoint.orientation.w = setpoint_yaw
     dinfo.enable_setpoint = enable_setpoint
-    dinfo.fmode = feedback_mode #VINS ro TAG
+    dinfo.fmode = feedback_mode #VINS or TAG
     pub_droneinfo.publish(dinfo)
-
-
-    arm.header.stamp = rospy.get_rostime()
-    arm.emergency = arm_emergency
-    arm.mode = arm_mode
-    arm.grasp = arm_grasp
-    arm.ClawRotation = claw_rotation 
-
-    arm.dof2point.position.x = set_dof2_x
-    arm.dof2point.position.y = set_dof2_y
-    pub_arm.publish(arm)
-    pub_balance.publish(arm)
 
 
     # print 'arm', set_dof2_x,set_dof2_y,'setpoint',setpoint_x,setpoint_y,setpoint_z
