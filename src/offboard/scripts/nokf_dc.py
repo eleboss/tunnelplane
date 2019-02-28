@@ -67,7 +67,7 @@ TAG_Y_BAIS = 0
 setpoint_yaw = 0
 setpoint_x = setpoint_y = setpoint_z = 0
 enable_setpoint = 0
-feedback_mode = 1
+feedback_mode = 0 #deault: 0=VINS
 KNOB_L = 0
 
 vins_x = vins_y = vins_z = 0
