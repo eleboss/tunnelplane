@@ -448,8 +448,8 @@ while not rospy.is_shutdown():
                                        PositionTarget.IGNORE_AFX + PositionTarget.IGNORE_AFY + PositionTarget.IGNORE_AFZ +
                                        PositionTarget.IGNORE_YAW_RATE  + PositionTarget.FORCE)
     raw_msg.header.stamp = stamp
-    output_x = 0.00
-    output_y = 0.08
+    # output_x = 0.00
+    # output_y = 0.08
     # output_z = 0.08
     # output_yaw = 0 
     # if SWITCH == 1:

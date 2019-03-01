@@ -24,9 +24,9 @@ enable_setpoint = 1
 KNOB_L = KNOB_R = BACK_ADJ = 100
 SWITCH = 100
 detected_tags = 0
-feedback_mode = 1
+feedback_mode = 0
 tko_x = tko_y = 0
-tko_z = 0.2
+tko_z = 0.25
 
 pos_fuse_x = pos_fuse_y = pos_fuse_z = 0
 odom_roll = odom_pitch = odom_yaw = 0

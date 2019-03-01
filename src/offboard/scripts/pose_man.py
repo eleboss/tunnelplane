@@ -24,7 +24,7 @@ odom_roll = odom_pitch = odom_yaw = 0
 vins_to_ned_roll = vins_to_ned_yaw = vins_to_ned_pitch = 0
 last_vins_x = last_vins_y = last_vins_z = 0
 last_vins_time = 0
-MAX_RANGE = 5
+MAX_RANGE = 10
 MAX_VEL_RANGE = 1
 lost_counter = 0
 
