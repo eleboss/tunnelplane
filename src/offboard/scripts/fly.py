@@ -25,7 +25,8 @@ KNOB_L = KNOB_R = BACK_ADJ = 100
 SWITCH = 100
 detected_tags = 0
 feedback_mode = 1
-tko_x = tko_y = tko_z = 0
+tko_x = tko_y = 0
+tko_z = 0.2
 
 pos_fuse_x = pos_fuse_y = pos_fuse_z = 0
 odom_roll = odom_pitch = odom_yaw = 0
@@ -157,6 +158,6 @@ while not rospy.is_shutdown():
     pub_droneinfo.publish(dinfo)
 
 
-    # print 'arm', set_dof2_x,set_dof2_y,'setpoint',setpoint_x,setpoint_y,setpoint_z
+    print 'setpoint',setpoint_x,setpoint_y,setpoint_z
 
     rate.sleep()

@@ -10,7 +10,7 @@ NED 对应 - X+ NORTH Y+ EAST Z+ DOWN
 因此在ros上使用速度控制的时候，直接使用ENU坐标系，不管是位置还是速度都是ENU，剩下的交给MAVROS处理就好来。
 
 
-
+In the transformation, negative angel in a matrix is the clockwise direction transformation.
 
 
 EKF2_AID_MASK中虽然说不是在NED下的EV要打勾，但是我在ROS用ENU，到pixhawk上的时候就自动钻换成NED了，因此不需要打勾
