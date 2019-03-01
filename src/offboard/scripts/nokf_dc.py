@@ -449,8 +449,8 @@ while not rospy.is_shutdown():
                                        PositionTarget.IGNORE_YAW_RATE  + PositionTarget.FORCE)
     raw_msg.header.stamp = stamp
     output_x = 0.00
-    output_y = 0.00
-    output_z = 0.08
+    output_y = 0.08
+    # output_z = 0.08
     # output_yaw = 0 
     # if SWITCH == 1:
     #     output_yaw = -np.pi/2
@@ -461,12 +461,12 @@ while not rospy.is_shutdown():
         output_x = 0.0
         output_y = 0.0
     # 自由落体测试，整定速度PID专用MPC_Z_VEL_*
-    if feedback_z > 0.3:
-        set_z = 1
-    if set_z:
-        output_z = -0.08
-        output_y = 0
-        output_x = 0
+    # if feedback_z > 0.3:
+    #     set_z = 1
+    # if set_z:
+    #     output_z = -0.08
+    #     output_y = 0
+    #     output_x = 0
     raw_msg.velocity.x = output_x
     raw_msg.velocity.y = output_y                             
     raw_msg.velocity.z = output_z
