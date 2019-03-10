@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(segmentation)
+project(tunnel_estimator)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -159,6 +159,8 @@ include_directories(include
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(scantocloud src/scantocloud.cpp)
 add_executable(pointprocess src/point_process.cpp)
+add_executable(nsector src/nsector.cpp)
+target_link_libraries(nsector ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 target_link_libraries(pointprocess ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 
