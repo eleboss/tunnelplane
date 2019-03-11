@@ -83,6 +83,7 @@ void callback_vins(const Odometry::ConstPtr &vins)
   vins_xyz_pt.y = vins_xyz(1);
   vins_xyz_pt.z = vins_xyz(2);
   //https://stackoverflow.com/questions/1568568/how-to-convert-euler-angles-to-directional-vector
+  //both vins's and odom's yaw increase in counter-clockwise direction  
   drone_vector(0) = cos(vins_yaw);
   drone_vector(1) = sin(vins_yaw);  
   drone_vector(2) = 0;
