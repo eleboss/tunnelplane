@@ -63,9 +63,12 @@ ros::Publisher pub_trans_right;
 double vins_pitch, vins_roll, vins_yaw;
 Vector4f vins_xyz(0,0,0,1);
 Vector4f vins_pcV(0,0,0,1);
+pcl::PointXYZ vins_xyz_pt(0,0,0);
 Vector3f normal_vec_left(0, 0, 0);
 Vector3f normal_vec_right(0, 0, 0);
 Vector3f drone_vector(0,0,0);
+VectorXf coeff_right;
+VectorXf coeff_left;
 
 void callback_vins(const Odometry::ConstPtr &vins)
 {
@@ -75,6 +78,10 @@ void callback_vins(const Odometry::ConstPtr &vins)
   vins_xyz(0) = vins->pose.pose.position.x;
   vins_xyz(1) = vins->pose.pose.position.y;
   vins_xyz(2) = vins->pose.pose.position.z;
+
+  vins_xyz_pt.x = vins_xyz(0);
+  vins_xyz_pt.y = vins_xyz(1);
+  vins_xyz_pt.z = vins_xyz(2);
   //https://stackoverflow.com/questions/1568568/how-to-convert-euler-angles-to-directional-vector
   drone_vector(0) = cos(vins_yaw);
   drone_vector(1) = sin(vins_yaw);  
@@ -175,7 +182,6 @@ void callback_pc(const PointCloud::ConstPtr &msg)
   {
     LEFT_VAILD = 1;
     vector<int> inliers_left;
-    VectorXf coeff_left;
     pcl::SampleConsensusModelPerpendicularPlane<pcl::PointXYZ>::Ptr model_p_left (new pcl::SampleConsensusModelPerpendicularPlane<pcl::PointXYZ> (vins_pcT_pass_left));
     pcl::PointCloud<pcl::PointXYZ>::Ptr vins_pcT_rs_left (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::RandomSampleConsensus<pcl::PointXYZ> ransac_left (model_p_left);
@@ -200,7 +206,6 @@ void callback_pc(const PointCloud::ConstPtr &msg)
   {
     RIGHT_VAILD = 1;
     vector<int> inliers_right;
-    VectorXf coeff_right;
     pcl::SampleConsensusModelPerpendicularPlane<pcl::PointXYZ>::Ptr model_p_right (new pcl::SampleConsensusModelPerpendicularPlane<pcl::PointXYZ> (vins_pcT_pass_right));
     pcl::PointCloud<pcl::PointXYZ>::Ptr vins_pcT_rs_right (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::RandomSampleConsensus<pcl::PointXYZ> ransac_right (model_p_right);
@@ -259,6 +264,8 @@ int main(int argc, char **argv)
       //https://www.vitutor.com/geometry/distance/line_plane.html
       abs(drone_vector.array() * normal_vec_left.array()) / abs(drone_vector.norm() * normal_vec_left.norm());
       abs(drone_vector.array() * normal_vec_right.array()) / abs(drone_vector.norm() * normal_vec_right.norm());
+      pcl::pointToPlaneDistance(vins_xyz_pt, coeff_right);
+      pcl::pointToPlaneDistance(vins_xyz_pt, coeff_left);
     }
 
     ros::spinOnce();
