@@ -29,6 +29,11 @@ tko_x = tko_y = 0
 tko_z = 0.6
 tko_yaw = 0
 
+vaild_angle = centric_distance = TUNNEL_VAILD = 0
+waypoint_yaw = 0
+TUNNING_ENABLE = 0
+TUNNING_FINISHED = 0
+
 MAX_FLY_RANGE = 8
 
 waypoint_x = waypoint_y = 0
@@ -92,13 +97,19 @@ def callback_odom(odom):
         tko_yaw = odom_yaw
         InitTko = False
 
-
-    
+def callback_tunnel(tunnel):
+    global vaild_angle, centric_distance, TUNNEL_VAILD, TUNNING_ENABLE, waypoint_yaw
+    vaild_angle = tunnel.pose.pose.position.x
+    centric_distance = tunnel.pose.pose.position.y
+    TUNNEL_VAILD = tunnel.pose.pose.position.z
+    if TUNNEL_VAILD:
+        TUNNING_ENABLE = 1
 
 rospy.init_node('drone_info')
 rc_in = rospy.Subscriber('mavros/rc/in', RCIn, callback_rc, queue_size=1)
 position_tag = rospy.Subscriber('apriltags/detections', AprilTagDetections, callback_tag, queue_size=1)
 subodom = rospy.Subscriber('mavros/local_position/odom', Odometry, callback_odom, queue_size=1)
+subtunnel = rospy.Subscriber('nsector/estimator', Odometry, callback_tunnel, queue_size=1)
 
 pub_droneinfo =  rospy.Publisher('drone_info', DroneInfo, queue_size=1)
 
@@ -114,6 +125,7 @@ while not rospy.is_shutdown():
                 setpoint_y = tko_y
                 setpoint_z = tko_z
                 setpoint_yaw = tko_yaw
+                waypoint_yaw = tko_yaw
                 TAKEOFF_ENABLE = False
 
 
@@ -121,6 +133,13 @@ while not rospy.is_shutdown():
     if KNOB_R == 2:
 
         feedback_mode = 0
+        
+        if TUNNING_ENABLE and TUNNING_FINISHED:
+            waypoint_yaw = odom_yaw - vaild_angle
+            setpoint_yaw = waypoint_yaw
+            TUNNING_ENABLE = 0
+        
+
         if waypoint_x >= MAX_FLY_RANGE:
             pass
         else:
@@ -130,12 +149,14 @@ while not rospy.is_shutdown():
         OUT = True
         #Trans to init yaw direction
         waypoint = np.array([waypoint_x, waypoint_y]).reshape(2, 1)
-        R_z_yaw = np.array([[np.cos(tko_yaw), -np.sin(tko_yaw)],
-                            [np.sin(tko_yaw), np.cos(tko_yaw)]])
+        R_z_yaw = np.array([[np.cos(waypoint_yaw), -np.sin(waypoint_yaw)],
+                            [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
         waypoint = np.dot(R_z_yaw, waypoint)
 
         setpoint_x = waypoint[0][0] + tko_x
         setpoint_y = waypoint[1][0] + tko_y
+
+
 
     elif KNOB_R == 1 :
         if OUT:
@@ -143,6 +164,11 @@ while not rospy.is_shutdown():
             OUT = False
     elif KNOB_R == 0 :
         feedback_mode = 0
+
+        if TUNNING_ENABLE and TUNNING_FINISHED:
+            waypoint_yaw = odom_yaw - vaild_angle
+            setpoint_yaw = waypoint_yaw
+            TUNNING_ENABLE = 0
 
         if waypoint_x >= 0:
             waypoint_x = waypoint_x - 0.005
@@ -154,8 +180,8 @@ while not rospy.is_shutdown():
 
         #Trans to init yaw direction
         waypoint = np.array([waypoint_x, waypoint_y]).reshape(2, 1)
-        R_z_yaw = np.array([[np.cos(tko_yaw), -np.sin(tko_yaw)],
-                            [np.sin(tko_yaw), np.cos(tko_yaw)]])
+        R_z_yaw = np.array([[np.cos(waypoint_yaw), -np.sin(waypoint_yaw)],
+                            [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
 
         waypoint = np.dot(R_z_yaw, waypoint)
 
@@ -173,8 +199,8 @@ while not rospy.is_shutdown():
         OUT = True
         #Trans to init yaw direction
         waypoint = np.array([waypoint_x, waypoint_y]).reshape(2, 1)
-        R_z_yaw = np.array([[np.cos(tko_yaw), -np.sin(tko_yaw)],
-                            [np.sin(tko_yaw), np.cos(tko_yaw)]])
+        R_z_yaw = np.array([[np.cos(waypoint_yaw), -np.sin(waypoint_yaw)],
+                            [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
         waypoint = np.dot(R_z_yaw, waypoint)
 
         setpoint_x = waypoint[0][0] + tko_x
@@ -194,14 +220,18 @@ while not rospy.is_shutdown():
 
         #Trans to init yaw direction
         waypoint = np.array([waypoint_x, waypoint_y]).reshape(2, 1)
-        R_z_yaw = np.array([[np.cos(tko_yaw), -np.sin(tko_yaw)],
-                            [np.sin(tko_yaw), np.cos(tko_yaw)]])
+        R_z_yaw = np.array([[np.cos(waypoint_yaw), -np.sin(waypoint_yaw)],
+                            [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
 
         waypoint = np.dot(R_z_yaw, waypoint)
 
         setpoint_x = waypoint[0][0] + tko_x
         setpoint_y = waypoint[1][0] + tko_y
 
+    if abs(waypoint_yaw - odom_yaw) < 0.03:
+        TUNNING_FINISHED = 1
+    else
+        TUNNING_FINISHED = 0
 
     if BACK_ADJ == 1:
         pass

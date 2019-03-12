@@ -34,10 +34,12 @@
 #include <pcl/sample_consensus/sac_model_plane.h>
 #include <pcl/sample_consensus/sac_model_sphere.h>
 #include <pcl/sample_consensus/sac_model_perpendicular_plane.h>
+#include <pcl/sample_consensus/sac_model_parallel_plane.h>
 
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Odometry.h>
 #include <sensor_msgs/point_cloud_conversion.h>
+
 
 char LEFT_VAILD = 0;
 char RIGHT_VAILD = 0;
@@ -50,10 +52,16 @@ double STA_MEANK = 50;
 double STA_STD_THRESH = 1.0;
 double ROR_RAD = 0.5;
 double ROS_NER = 1;
-double TUNNEL_WIDTH = 10.0;
-double RANSAC_PLANE_ANG_TOR = 0.15;
+double TUNNEL_WIDTH = 4.2;
+double RANSAC_PLANE_ANG_TOR = 0.05;
 double RANSAC_DIS_THR = 0.1;
 double RANSAC_VAILD_NUM =30;
+double VAILD_ANG_TOR = 0.05;
+double VAILD_DIS_TOR = 999;
+
+float vaild_angle = 0;
+float centric_distance = 0;
+float last_vaild_distance = TUNNEL_WIDTH;
 
 
 using namespace Eigen;
@@ -71,6 +79,7 @@ ros::Publisher pub_trans_after;
 ros::Publisher pub_trans_outlier;
 ros::Publisher pub_trans_left;
 ros::Publisher pub_trans_right;
+ros::Publisher pub_estimation;
 
 double angle_left, angle_right, distance_left, distance_right;
 
@@ -86,7 +95,11 @@ VectorXf coeff_left;
 
 double line_plane_angle(Eigen::Vector3f line_vector, Eigen::Vector3f plane_norm)
 {
-  return asin(abs((line_vector.array() * plane_norm.array()).sum()) / abs(line_vector.norm() * plane_norm.norm()));
+  return asin((line_vector.array() * plane_norm.array()).sum() / line_vector.norm() * plane_norm.norm());
+}
+double two_vector_angle(Eigen::Vector3f vector1, Eigen::Vector3f vector2)
+{
+  return acos((vector1.array() * vector2.array()).sum() / vector1.norm() * vector2.norm());
 }
 
 void callback_vins(const Odometry::ConstPtr &vins)
@@ -111,6 +124,7 @@ void callback_vins(const Odometry::ConstPtr &vins)
 
 void callback_pc(const PointCloud::ConstPtr &msg)
 {
+  Odometry tunnel_est;
   PointCloud2 vins_pc2;
   //Convert vins point cloud data to Pointcloud2 format
   sensor_msgs::convertPointCloudToPointCloud2(*msg, vins_pc2); 	
@@ -202,10 +216,10 @@ void callback_pc(const PointCloud::ConstPtr &msg)
   {
     LEFT_VAILD = 1;
     vector<int> inliers_left;
-    pcl::SampleConsensusModelPerpendicularPlane<pcl::PointXYZ>::Ptr model_p_left (new pcl::SampleConsensusModelPerpendicularPlane<pcl::PointXYZ> (vins_pcT_pass_left));
+    pcl::SampleConsensusModelParallelPlane<pcl::PointXYZ>::Ptr model_p_left (new pcl::SampleConsensusModelParallelPlane<pcl::PointXYZ> (vins_pcT_pass_left));
     pcl::PointCloud<pcl::PointXYZ>::Ptr vins_pcT_rs_left (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::RandomSampleConsensus<pcl::PointXYZ> ransac_left (model_p_left);
-    model_p_left->setAxis (Vector3f (0.0, 1.0, 0.0));
+    model_p_left->setAxis (Vector3f (0.0, 0.0, 1.0));
     model_p_left->setEpsAngle (RANSAC_PLANE_ANG_TOR);
     ransac_left.setDistanceThreshold (RANSAC_DIS_THR);
     ransac_left.computeModel();
@@ -216,6 +230,19 @@ void callback_pc(const PointCloud::ConstPtr &msg)
     normal_vec_left(0) = coeff_left(0);
     normal_vec_left(1) = coeff_left(1);
     normal_vec_left(2) = coeff_left(2);
+
+    //pick up a point in cloud
+    Vector3f ramdon_point_in_leftcloud(
+    vins_pcT_pass_left->points[vins_pcT_pass_left->points.size()/2].x,
+    vins_pcT_pass_left->points[vins_pcT_pass_left->points.size()/2].y,
+    vins_pcT_pass_left->points[vins_pcT_pass_left->points.size()/2].z);
+    //if the angle between vector(vins to point) and normal of plane are large than PI/2, we re direct the normal to point inside of the tunnel
+    if(two_vector_angle(ramdon_point_in_leftcloud - vins_xyz.head(3),normal_vec_left) > 1.5707963)
+    {
+      normal_vec_left = - normal_vec_left;
+    }
+
+    pub_trans_left.publish(vins_pcT_rs_left);
   }
   else
   {
@@ -226,36 +253,89 @@ void callback_pc(const PointCloud::ConstPtr &msg)
   {
     RIGHT_VAILD = 1;
     vector<int> inliers_right;
-    pcl::SampleConsensusModelPerpendicularPlane<pcl::PointXYZ>::Ptr model_p_right (new pcl::SampleConsensusModelPerpendicularPlane<pcl::PointXYZ> (vins_pcT_pass_right));
+    pcl::SampleConsensusModelParallelPlane<pcl::PointXYZ>::Ptr model_p_right (new pcl::SampleConsensusModelParallelPlane<pcl::PointXYZ> (vins_pcT_pass_right));
     pcl::PointCloud<pcl::PointXYZ>::Ptr vins_pcT_rs_right (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::RandomSampleConsensus<pcl::PointXYZ> ransac_right (model_p_right);
-    model_p_right->setAxis (Vector3f (0.0, 1.0, 0.0));
+    model_p_right->setAxis (Vector3f (0.0, 0.0, 1.0));
     model_p_right->setEpsAngle (RANSAC_PLANE_ANG_TOR);
     ransac_right.setDistanceThreshold (RANSAC_DIS_THR);
     ransac_right.computeModel();
     ransac_right.getInliers(inliers_right);
     ransac_right.getModelCoefficients (coeff_right);
     pcl::copyPointCloud<pcl::PointXYZ>(*vins_pcT_pass_right, inliers_right, *vins_pcT_rs_right);
-    // ROS_INFO_STREAM(coeff_right);
     normal_vec_right(0) = coeff_right(0);
     normal_vec_right(1) = coeff_right(1);
     normal_vec_right(2) = coeff_right(2);
+   //pick up a point in cloud
+    Vector3f ramdon_point_in_rightcloud(
+    vins_pcT_pass_right->points[vins_pcT_pass_right->points.size()/2].x,
+    vins_pcT_pass_right->points[vins_pcT_pass_right->points.size()/2].y,
+    vins_pcT_pass_right->points[vins_pcT_pass_right->points.size()/2].z);
+    // ROS_INFO_STREAM(normal_vec_right);
+    // ROS_INFO_STREAM("Before"<<two_vector_angle(ramdon_point_in_rightcloud - vins_xyz.head(3),normal_vec_right));
+    //if the angle between vector(vins to point) and normal of plane are large than PI/2, we re direct the normal to point inside of the tunnel
+    if(two_vector_angle(ramdon_point_in_rightcloud - vins_xyz.head(3),normal_vec_right) < 1.5707963)
+    {
+      normal_vec_right = - normal_vec_right;
+    }
+    // ROS_INFO_STREAM("After"<<two_vector_angle(ramdon_point_in_cloud - vins_xyz.head(3),normal_vec_right));
+    // ROS_INFO_STREAM(normal_vec_right);
+    pub_trans_right.publish(vins_pcT_rs_right);
   }
   else
   {
     RIGHT_VAILD = 0;
   }
 
-  if(LEFT_VAILD && RIGHT_VAILD)
-  {
-    TUNNEL_VAILD = 1;
-  }
-  else
-  {
-    TUNNEL_VAILD = 0;
-  }
-  // pub_trans_left.publish(vins_pcT_rs_left);
-  // pub_trans_right.publish(vins_pcT_rs_right);
+
+    if(LEFT_VAILD)
+    {
+      //https://www.vitutor.com/geometry/distance/line_plane.html
+      angle_left = line_plane_angle(drone_vector, normal_vec_left);
+      distance_left = pcl::pointToPlaneDistance(vins_xyz_pt, coeff_left);
+      // ROS_INFO_STREAM("nor left"<<normal_vec_left);
+    }
+    if(RIGHT_VAILD)
+    {
+      //https://www.vitutor.com/geometry/distance/line_plane.html
+      angle_right = line_plane_angle(drone_vector, normal_vec_right);
+      distance_right = pcl::pointToPlaneDistance(vins_xyz_pt, coeff_right);
+      // ROS_INFO_STREAM("nor right"<<normal_vec_right);
+    }
+    if(LEFT_VAILD && RIGHT_VAILD)
+    {
+      if (abs(angle_left - angle_right) <= VAILD_ANG_TOR)
+      {
+        if(abs((distance_left + distance_right) - TUNNEL_WIDTH) <= VAILD_DIS_TOR)
+        {
+          TUNNEL_VAILD = 1;
+          vaild_angle = (angle_left + angle_right)/2;
+          centric_distance = distance_left - distance_right;
+          // ROS_INFO_STREAM(vaild_angle<<" "<< centric_distance);
+        }
+        else
+        {
+          TUNNEL_VAILD = 0;
+        }
+      }
+      else
+      {
+        TUNNEL_VAILD = 0;
+      }
+    }
+    else
+    {
+      TUNNEL_VAILD = 0;
+    }
+    tunnel_est.pose.pose.position.x = vaild_angle;
+    tunnel_est.pose.pose.position.y = centric_distance;
+    tunnel_est.pose.pose.position.z = TUNNEL_VAILD;
+    tunnel_est.pose.pose.orientation.x = LEFT_VAILD;
+    tunnel_est.pose.pose.orientation.y = angle_left;
+    tunnel_est.pose.pose.orientation.z = RIGHT_VAILD;
+    tunnel_est.pose.pose.orientation.w = angle_right;
+    pub_estimation.publish(tunnel_est);
+
 
 }
 
@@ -289,7 +369,7 @@ int main(int argc, char **argv)
   nh.param("TUNNEL_WIDTH", TUNNEL_WIDTH, 10.0);
   ROS_INFO_STREAM("We assume the tunnel is wider than" << TUNNEL_WIDTH <<"meter");
 
-  nh.param("RANSAC_PLANE_ANG_TOR", RANSAC_PLANE_ANG_TOR, 0.15);
+  nh.param("RANSAC_PLANE_ANG_TOR", RANSAC_PLANE_ANG_TOR, 0.05);
   ROS_INFO_STREAM("Angle tor of ransac:" << RANSAC_PLANE_ANG_TOR <<"rad");
 
   nh.param("RANSAC_DIS_THR", RANSAC_DIS_THR, 0.15);
@@ -307,25 +387,16 @@ int main(int argc, char **argv)
   pub_trans_left = nh.advertise<PointCloudXYZ>("nsector/left", 1);
   pub_trans_right = nh.advertise<PointCloudXYZ>("nsector/right", 1);
 
+  pub_estimation = nh.advertise<Odometry>("nsector/estimator", 1);
+
 
   ros::Rate loop_rate(20);
   while(ros::ok())
   {
 
-    if(LEFT_VAILD)
-    {
-      //https://www.vitutor.com/geometry/distance/line_plane.html
-      angle_left = line_plane_angle(drone_vector, normal_vec_left);
-      distance_left = pcl::pointToPlaneDistance(vins_xyz_pt, coeff_left);
-    }
-    if(RIGHT_VAILD)
-    {
-      //https://www.vitutor.com/geometry/distance/line_plane.html
-      angle_right = line_plane_angle(drone_vector, normal_vec_right);
-      distance_right = pcl::pointToPlaneDistance(vins_xyz_pt, coeff_right);
-    }
 
-    ROS_INFO_STREAM(angle_left<<" "<<angle_right<<" "<<distance_right<<" "<<distance_left);
+
+    // ROS_INFO_STREAM(angle_left<<" "<<angle_right<<" "<<distance_right<<" "<<distance_left);
 
     ros::spinOnce();
     loop_rate.sleep();
