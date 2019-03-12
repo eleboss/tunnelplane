@@ -37,12 +37,11 @@ def callback_vins(vins):
         qn_vins = [vins.pose.pose.orientation.x, vins.pose.pose.orientation.y,
                    vins.pose.pose.orientation.z, vins.pose.pose.orientation.w]
         (vins_roll, vins_pitch, vins_yaw) = euler_from_quaternion(qn_vins)
-        print 'Please rotate the drone to find VINS yaw angel lower than 0.001, current angel: ',vins_yaw
+        print 'Current VINS Angel: ',vins_yaw, 'ODOM yaw:', odom_yaw
         #calibration
-        if abs(vins_yaw) < 0.001:
-            vins_to_ned_yaw = odom_yaw
-            print 'Init success',', the difference is', vins_to_ned_yaw,'starting sending vision aid to pixhawk.'
-            InitVins = False
+        vins_to_ned_yaw = odom_yaw - vins_yaw
+        print 'Init success',', the difference is', vins_to_ned_yaw,'starting sending vision aid to pixhawk.'
+        InitVins = False
         lost_counter = 0
     else:
         vins_seq = vins.header.seq

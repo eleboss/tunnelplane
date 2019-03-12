@@ -43,6 +43,19 @@ char LEFT_VAILD = 0;
 char RIGHT_VAILD = 0;
 char TUNNEL_VAILD = 0;
 
+double PASSTHROUGH_ZMIN = 0.2;
+double PASSTHROUGH_ZMAX = 4;
+double FRONTFILTER_RAD = 4;
+double STA_MEANK = 50;
+double STA_STD_THRESH = 1.0;
+double ROR_RAD = 0.5;
+double ROS_NER = 1;
+double TUNNEL_WIDTH = 10.0;
+double RANSAC_PLANE_ANG_TOR = 0.15;
+double RANSAC_DIS_THR = 0.1;
+double RANSAC_VAILD_NUM =30;
+
+
 using namespace Eigen;
 using namespace std;
 #define PI 3.14159265
@@ -59,6 +72,7 @@ ros::Publisher pub_trans_outlier;
 ros::Publisher pub_trans_left;
 ros::Publisher pub_trans_right;
 
+double angle_left, angle_right, distance_left, distance_right;
 
 double vins_pitch, vins_roll, vins_yaw;
 Vector4f vins_xyz(0,0,0,1);
@@ -69,6 +83,11 @@ Vector3f normal_vec_right(0, 0, 0);
 Vector3f drone_vector(0,0,0);
 VectorXf coeff_right;
 VectorXf coeff_left;
+
+double line_plane_angle(Eigen::Vector3f line_vector, Eigen::Vector3f plane_norm)
+{
+  return asin(abs((line_vector.array() * plane_norm.array()).sum()) / abs(line_vector.norm() * plane_norm.norm()));
+}
 
 void callback_vins(const Odometry::ConstPtr &vins)
 {
@@ -105,7 +124,7 @@ void callback_pc(const PointCloud::ConstPtr &msg)
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setInputCloud (vins_pcT);
   pass.setFilterFieldName ("z");
-  pass.setFilterLimits (0.2, 4.0);
+  pass.setFilterLimits (PASSTHROUGH_ZMIN, PASSTHROUGH_ZMAX);
   // pass.setFilterLimitsNegative (true);
   pass.filter (*vins_pcT_pass);
 
@@ -118,7 +137,7 @@ void callback_pc(const PointCloud::ConstPtr &msg)
     vins_pcV(1) = vins_pcT_pass->points[i].y;
     vins_pcV(2) = vins_pcT_pass->points[i].z;
     pcl::PointXYZ pt(vins_pcT_pass->points[i].x, vins_pcT_pass->points[i].y, vins_pcT_pass->points[i].z);
-    if (pcl::distances::l2Sqr(vins_xyz, vins_pcV) < 4.0 && vins_pcT_pass->points[i].z > 0)
+    if (pcl::distances::l2Sqr(vins_xyz, vins_pcV) < FRONTFILTER_RAD && vins_pcT_pass->points[i].z > 0)
     {
       front_inliers->indices.push_back(i);
       // vins_pcT_pass->points[i].z = 0;
@@ -136,8 +155,8 @@ void callback_pc(const PointCloud::ConstPtr &msg)
   PointCloudXYZ::Ptr vins_pcT_sta_outliers (new PointCloudXYZ());
   pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
   sor.setInputCloud (vins_pcT_pass);
-  sor.setMeanK (50);
-  sor.setStddevMulThresh (1.0);
+  sor.setMeanK (STA_MEANK);
+  sor.setStddevMulThresh (STA_STD_THRESH);
   sor.filter (*vins_pcT_staf);
   // sor.setNegative (true);
   // sor.filter (*vins_pcT_sta_outliers);
@@ -150,8 +169,8 @@ void callback_pc(const PointCloud::ConstPtr &msg)
   //qualified points can search at least n neighbors in Radius.
   pcl::RadiusOutlierRemoval<pcl::PointXYZ> rorfilter; // Initializing with true will allow us to extract the removed indices
   rorfilter.setInputCloud (vins_pcT_staf);
-  rorfilter.setRadiusSearch (0.5);//Radius
-  rorfilter.setMinNeighborsInRadius (1); //n neighbors
+  rorfilter.setRadiusSearch (ROR_RAD);//Radius
+  rorfilter.setMinNeighborsInRadius (ROS_NER); //n neighbors
   rorfilter.filter (*vins_pcT_radf);
   rorfilter.setNegative (true);
   // rorfilter.filter (*vins_pcT_rad_outliers);
@@ -163,12 +182,12 @@ void callback_pc(const PointCloud::ConstPtr &msg)
   PointCloudXYZ::Ptr vins_pcT_pass_right (new PointCloudXYZ()); //Y>0
   pass.setInputCloud(vins_pcT_radf);
   pass.setFilterFieldName ("y");
-  pass.setFilterLimits (0, 10.0); 
+  pass.setFilterLimits (-TUNNEL_WIDTH, 0.0); 
   pass.filter (*vins_pcT_pass_right);
 
   pass.setInputCloud (vins_pcT_radf);
   pass.setFilterFieldName ("y");
-  pass.setFilterLimits(-10, 0);
+  pass.setFilterLimits(0.0, TUNNEL_WIDTH);
   pass.filter(*vins_pcT_pass_left);
 
   // pub_trans_after.publish(vins_pcT_pass_left);
@@ -179,7 +198,7 @@ void callback_pc(const PointCloud::ConstPtr &msg)
 
   //pointclouds.org/documentation/tutorials/random_sample_consensus.php#random-sample-consensus
   //left
-  if(vins_pcT_pass_left->points.size() > 50)
+  if(vins_pcT_pass_left->points.size() > RANSAC_VAILD_NUM)
   {
     LEFT_VAILD = 1;
     vector<int> inliers_left;
@@ -187,8 +206,8 @@ void callback_pc(const PointCloud::ConstPtr &msg)
     pcl::PointCloud<pcl::PointXYZ>::Ptr vins_pcT_rs_left (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::RandomSampleConsensus<pcl::PointXYZ> ransac_left (model_p_left);
     model_p_left->setAxis (Vector3f (0.0, 1.0, 0.0));
-    model_p_left->setEpsAngle (0.15);
-    ransac_left.setDistanceThreshold (.10);
+    model_p_left->setEpsAngle (RANSAC_PLANE_ANG_TOR);
+    ransac_left.setDistanceThreshold (RANSAC_DIS_THR);
     ransac_left.computeModel();
     ransac_left.getInliers(inliers_left);
     ransac_left.getModelCoefficients (coeff_left);
@@ -203,7 +222,7 @@ void callback_pc(const PointCloud::ConstPtr &msg)
     LEFT_VAILD = 0;
   }
   //right
-  if(vins_pcT_pass_right->points.size() > 50)
+  if(vins_pcT_pass_right->points.size() > RANSAC_VAILD_NUM)
   {
     RIGHT_VAILD = 1;
     vector<int> inliers_right;
@@ -211,8 +230,8 @@ void callback_pc(const PointCloud::ConstPtr &msg)
     pcl::PointCloud<pcl::PointXYZ>::Ptr vins_pcT_rs_right (new pcl::PointCloud<pcl::PointXYZ>);
     pcl::RandomSampleConsensus<pcl::PointXYZ> ransac_right (model_p_right);
     model_p_right->setAxis (Vector3f (0.0, 1.0, 0.0));
-    model_p_right->setEpsAngle (0.15);
-    ransac_right.setDistanceThreshold (.10);
+    model_p_right->setEpsAngle (RANSAC_PLANE_ANG_TOR);
+    ransac_right.setDistanceThreshold (RANSAC_DIS_THR);
     ransac_right.computeModel();
     ransac_right.getInliers(inliers_right);
     ransac_right.getModelCoefficients (coeff_right);
@@ -245,8 +264,41 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "nsector");
   ros::NodeHandle nh;
-  ros::Subscriber sub = nh.subscribe<PointCloud>("vins_estimator/point_cloud", 1, callback_pc);
 
+  nh.param("PASSTHROUGH_ZMIN", PASSTHROUGH_ZMIN, 0.2);
+  ROS_INFO_STREAM("Min height of pass through filter, used to filter the ground points to find the wall" << PASSTHROUGH_ZMIN);
+
+  nh.param("PASSTHROUGH_ZMAX", PASSTHROUGH_ZMAX, 4.0);
+  ROS_INFO_STREAM("Max height of pass through filter, used to filter the ground points to find the wall " << PASSTHROUGH_ZMAX);
+
+  nh.param("FRONTFILTER_RAD", FRONTFILTER_RAD, 4.0);
+  ROS_INFO_STREAM("Filter the front points, radius:" << FRONTFILTER_RAD<<" meter");
+
+  nh.param("STA_MEANK", STA_MEANK, 50.0);
+  ROS_INFO_STREAM("statistics filter, compare with" << FRONTFILTER_RAD<<" points");
+
+  nh.param("STA_STD_THRESH", STA_STD_THRESH, 50.0);
+  ROS_INFO_STREAM("std of statistics filter" << STA_STD_THRESH);
+
+  nh.param("ROR_RAD", ROR_RAD, 0.5);
+  ROS_INFO_STREAM("RAD filter, Find points in" << ROR_RAD <<"meter");
+
+  nh.param("ROS_NER", ROS_NER, 0.5);
+  ROS_INFO_STREAM("Compare with" << ROS_NER <<"neighboor");
+
+  nh.param("TUNNEL_WIDTH", TUNNEL_WIDTH, 10.0);
+  ROS_INFO_STREAM("We assume the tunnel is wider than" << TUNNEL_WIDTH <<"meter");
+
+  nh.param("RANSAC_PLANE_ANG_TOR", RANSAC_PLANE_ANG_TOR, 0.15);
+  ROS_INFO_STREAM("Angle tor of ransac:" << RANSAC_PLANE_ANG_TOR <<"rad");
+
+  nh.param("RANSAC_DIS_THR", RANSAC_DIS_THR, 0.15);
+  ROS_INFO_STREAM("Dis tor of ransac:" << RANSAC_DIS_THR <<"meter");
+
+  nh.param("RANSAC_VAILD_NUM", RANSAC_VAILD_NUM, 30.0);
+  ROS_INFO_STREAM("Vaild tunnel direction estimation needs at least" << RANSAC_VAILD_NUM <<"points");
+
+  ros::Subscriber sub = nh.subscribe<PointCloud>("vins_estimator/point_cloud", 1, callback_pc);
   ros::Subscriber sub_vins = nh.subscribe<Odometry>("vins_estimator/odometry", 1, callback_vins);
 
   pub_trans = nh.advertise<PointCloudXYZ>("nsector/est", 1);
@@ -260,14 +312,20 @@ int main(int argc, char **argv)
   while(ros::ok())
   {
 
-    if(TUNNEL_VAILD)
+    if(LEFT_VAILD)
     {
       //https://www.vitutor.com/geometry/distance/line_plane.html
-      abs(drone_vector.array() * normal_vec_left.array()) / abs(drone_vector.norm() * normal_vec_left.norm());
-      abs(drone_vector.array() * normal_vec_right.array()) / abs(drone_vector.norm() * normal_vec_right.norm());
-      pcl::pointToPlaneDistance(vins_xyz_pt, coeff_right);
-      pcl::pointToPlaneDistance(vins_xyz_pt, coeff_left);
+      angle_left = line_plane_angle(drone_vector, normal_vec_left);
+      distance_left = pcl::pointToPlaneDistance(vins_xyz_pt, coeff_left);
     }
+    if(RIGHT_VAILD)
+    {
+      //https://www.vitutor.com/geometry/distance/line_plane.html
+      angle_right = line_plane_angle(drone_vector, normal_vec_right);
+      distance_right = pcl::pointToPlaneDistance(vins_xyz_pt, coeff_right);
+    }
+
+    ROS_INFO_STREAM(angle_left<<" "<<angle_right<<" "<<distance_right<<" "<<distance_left);
 
     ros::spinOnce();
     loop_rate.sleep();
