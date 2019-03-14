@@ -25,7 +25,7 @@ public:
     laser_notifier_.registerCallback(
       boost::bind(&LaserScanToPointCloud::scanCallback, this, _1));
     laser_notifier_.setTolerance(ros::Duration(0.01));
-    scan_pub_ = n_.advertise<sensor_msgs::PointCloud2>("/rplidar/pointcloud",1);
+    scan_pub_ = n_.advertise<sensor_msgs::PointCloud2>("rplidar/pointcloud",1);
   }
 
   void scanCallback (const sensor_msgs::LaserScan::ConstPtr& scan_in)
