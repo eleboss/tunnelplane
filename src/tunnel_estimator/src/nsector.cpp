@@ -58,6 +58,7 @@ double RANSAC_DIS_THR = 0.1;
 double RANSAC_VAILD_NUM =30;
 double VAILD_ANG_TOR = 0.05;
 double VAILD_DIS_TOR = 999;
+double VIZ = 0;
 
 float vaild_angle = 0;
 float centric_distance = 0;
@@ -204,8 +205,8 @@ void callback_pc(const PointCloud::ConstPtr &msg)
   pass.setFilterLimits(0.0, TUNNEL_WIDTH);
   pass.filter(*vins_pcT_pass_left);
 
-  // pub_trans_after.publish(vins_pcT_pass_left);
-  // pub_trans_outlier.publish(vins_pcT_pass_right);
+  pub_trans_after.publish(vins_pcT_radf);
+
 
   // ROS_INFO_STREAM("we have %d points in left cloud" << vins_pcT_pass_left->points.size ());
   // ROS_INFO_STREAM("we have %d points in right cloud" << vins_pcT_pass_right->points.size ());
@@ -241,8 +242,8 @@ void callback_pc(const PointCloud::ConstPtr &msg)
     {
       normal_vec_left = - normal_vec_left;
     }
-
-    pub_trans_left.publish(vins_pcT_rs_left);
+    if(VIZ)
+      pub_trans_left.publish(vins_pcT_rs_left);
   }
   else
   {
@@ -280,7 +281,8 @@ void callback_pc(const PointCloud::ConstPtr &msg)
     }
     // ROS_INFO_STREAM("After"<<two_vector_angle(ramdon_point_in_cloud - vins_xyz.head(3),normal_vec_right));
     // ROS_INFO_STREAM(normal_vec_right);
-    pub_trans_right.publish(vins_pcT_rs_right);
+    if(VIZ)
+      pub_trans_right.publish(vins_pcT_rs_right);
   }
   else
   {
@@ -312,6 +314,7 @@ void callback_pc(const PointCloud::ConstPtr &msg)
           vaild_angle = (angle_left + angle_right)/2;
           centric_distance = distance_left - distance_right;
           // ROS_INFO_STREAM(vaild_angle<<" "<< centric_distance);
+          ROS_INFO_STREAM("angle "<<vaild_angle<<" distance "<<centric_distance<<"left angle:"<<angle_left<<"right angle"<<angle_right);
         }
         else
         {
@@ -334,6 +337,7 @@ void callback_pc(const PointCloud::ConstPtr &msg)
     tunnel_est.pose.pose.orientation.y = angle_left;
     tunnel_est.pose.pose.orientation.z = RIGHT_VAILD;
     tunnel_est.pose.pose.orientation.w = angle_right;
+    
     pub_estimation.publish(tunnel_est);
 
 
@@ -344,46 +348,50 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "nsector");
   ros::NodeHandle nh;
+  ros::NodeHandle _nh("~"); // to get the private params
 
-  nh.param("PASSTHROUGH_ZMIN", PASSTHROUGH_ZMIN, 0.2);
-  ROS_INFO_STREAM("Min height of pass through filter, used to filter the ground points to find the wall" << PASSTHROUGH_ZMIN);
+  _nh.param("PASSTHROUGH_ZMIN", PASSTHROUGH_ZMIN, 0.2);
+  ROS_INFO_STREAM("Min height of pass through filter, used to filter the ground points to find the wall " << PASSTHROUGH_ZMIN);
 
-  nh.param("PASSTHROUGH_ZMAX", PASSTHROUGH_ZMAX, 4.0);
+  _nh.param("PASSTHROUGH_ZMAX", PASSTHROUGH_ZMAX, 4.0);
   ROS_INFO_STREAM("Max height of pass through filter, used to filter the ground points to find the wall " << PASSTHROUGH_ZMAX);
 
-  nh.param("FRONTFILTER_RAD", FRONTFILTER_RAD, 4.0);
+  _nh.param("FRONTFILTER_RAD", FRONTFILTER_RAD, 4.0);
   ROS_INFO_STREAM("Filter the front points, radius:" << FRONTFILTER_RAD<<" meter");
 
-  nh.param("STA_MEANK", STA_MEANK, 50.0);
-  ROS_INFO_STREAM("statistics filter, compare with" << FRONTFILTER_RAD<<" points");
+  _nh.param("STA_MEANK", STA_MEANK, 50.0);
+  ROS_INFO_STREAM("statistics filter, compare with " << STA_MEANK<<" points");
 
-  nh.param("STA_STD_THRESH", STA_STD_THRESH, 50.0);
+  _nh.param("STA_STD_THRESH", STA_STD_THRESH, 50.0);
   ROS_INFO_STREAM("std of statistics filter" << STA_STD_THRESH);
 
-  nh.param("ROR_RAD", ROR_RAD, 0.5);
-  ROS_INFO_STREAM("RAD filter, Find points in" << ROR_RAD <<"meter");
+  _nh.param("ROR_RAD", ROR_RAD, 0.5);
+  ROS_INFO_STREAM("RAD filter, Find points in " << ROR_RAD <<" meters");
 
-  nh.param("ROS_NER", ROS_NER, 0.5);
-  ROS_INFO_STREAM("Compare with" << ROS_NER <<"neighboor");
+  _nh.param("ROS_NER", ROS_NER, 1.0);
+  ROS_INFO_STREAM("RAF filter vaild point can find " << ROS_NER <<" neighboor in "<<ROR_RAD<<"meter");
 
-  nh.param("TUNNEL_WIDTH", TUNNEL_WIDTH, 10.0);
-  ROS_INFO_STREAM("We assume the tunnel is wider than" << TUNNEL_WIDTH <<"meter");
+  _nh.param("TUNNEL_WIDTH", TUNNEL_WIDTH, 10.0);
+  ROS_INFO_STREAM("We assume the tunnel is wider than " << TUNNEL_WIDTH <<"meter");
 
-  nh.param("RANSAC_PLANE_ANG_TOR", RANSAC_PLANE_ANG_TOR, 0.05);
+  _nh.param("RANSAC_PLANE_ANG_TOR", RANSAC_PLANE_ANG_TOR, 0.05);
   ROS_INFO_STREAM("Angle tor of ransac:" << RANSAC_PLANE_ANG_TOR <<"rad");
 
-  nh.param("RANSAC_DIS_THR", RANSAC_DIS_THR, 0.15);
+  _nh.param("RANSAC_DIS_THR", RANSAC_DIS_THR, 0.15);
   ROS_INFO_STREAM("Dis tor of ransac:" << RANSAC_DIS_THR <<"meter");
 
-  nh.param("RANSAC_VAILD_NUM", RANSAC_VAILD_NUM, 30.0);
-  ROS_INFO_STREAM("Vaild tunnel direction estimation needs at least" << RANSAC_VAILD_NUM <<"points");
+  _nh.param("RANSAC_VAILD_NUM", RANSAC_VAILD_NUM, 30.0);
+  ROS_INFO_STREAM("Vaild tunnel direction estimation needs at least " << RANSAC_VAILD_NUM <<"points");
+
+  _nh.param("VIZ", VIZ, 0.0);
+  ROS_INFO_STREAM("Visualize "<< VIZ);
 
   ros::Subscriber sub = nh.subscribe<PointCloud>("vins_estimator/point_cloud", 1, callback_pc);
   ros::Subscriber sub_vins = nh.subscribe<Odometry>("vins_estimator/odometry", 1, callback_vins);
 
-  pub_trans = nh.advertise<PointCloudXYZ>("nsector/est", 1);
-  pub_trans_after = nh.advertise<PointCloudXYZ>("nsector/after", 1);
-  pub_trans_outlier = nh.advertise<PointCloudXYZ>("nsector/outlier", 1);
+  // pub_trans = nh.advertise<PointCloudXYZ>("nsector/est", 1);
+  pub_trans_after = nh.advertise<PointCloudXYZ>("nsector/filtered", 1);
+  // pub_trans_outlier = nh.advertise<PointCloudXYZ>("nsector/outlier", 1);
   pub_trans_left = nh.advertise<PointCloudXYZ>("nsector/left", 1);
   pub_trans_right = nh.advertise<PointCloudXYZ>("nsector/right", 1);
 

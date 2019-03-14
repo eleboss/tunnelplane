@@ -32,7 +32,7 @@ tko_yaw = 0
 vaild_angle = centric_distance = TUNNEL_VAILD = 0
 waypoint_yaw = 0
 TUNNING_ENABLE = 0
-TUNNING_FINISHED = 0
+TUNNING_FINISHED = 1
 
 MAX_FLY_RANGE = 8
 
@@ -71,7 +71,7 @@ def callback_rc(rc):
     if rc.channels[7] >= 1644 and rc.channels[7] < 1933:
         KNOB_R = 2
 
-    if rc.channels[6] == 1065:
+    if rc.channels[6] <= 1100:
         BACK_ADJ = 1
     else:
         BACK_ADJ = 0
@@ -128,16 +128,19 @@ while not rospy.is_shutdown():
                 waypoint_yaw = tko_yaw
                 TAKEOFF_ENABLE = False
 
-
+    # if BACK_ADJ == 1 and pos_fuse_z > 0.1:
+    if BACK_ADJ == 1:
+        if TUNNING_ENABLE:
+            waypoint_yaw = odom_yaw - vaild_angle
+            TUNNING_ENABLE = 0
+        if not TUNNING_FINISHED:
+            setpoint_yaw = waypoint_yaw
+    else:
+        pass
 
     if KNOB_R == 2:
 
         feedback_mode = 0
-        
-        if TUNNING_ENABLE and TUNNING_FINISHED:
-            waypoint_yaw = odom_yaw - vaild_angle
-            setpoint_yaw = waypoint_yaw
-            TUNNING_ENABLE = 0
         
 
         if waypoint_x >= MAX_FLY_RANGE:
@@ -164,11 +167,6 @@ while not rospy.is_shutdown():
             OUT = False
     elif KNOB_R == 0 :
         feedback_mode = 0
-
-        if TUNNING_ENABLE and TUNNING_FINISHED:
-            waypoint_yaw = odom_yaw - vaild_angle
-            setpoint_yaw = waypoint_yaw
-            TUNNING_ENABLE = 0
 
         if waypoint_x >= 0:
             waypoint_x = waypoint_x - 0.005
@@ -228,15 +226,13 @@ while not rospy.is_shutdown():
         setpoint_x = waypoint[0][0] + tko_x
         setpoint_y = waypoint[1][0] + tko_y
 
-    if abs(waypoint_yaw - odom_yaw) < 0.03:
-        TUNNING_FINISHED = 1
-    else
-        TUNNING_FINISHED = 0
 
-    if BACK_ADJ == 1:
-        pass
+
+
+    if abs(setpoint_yaw - odom_yaw) < 0.03:
+        TUNNING_FINISHED = 1
     else:
-        pass
+        TUNNING_FINISHED = 0
 
     # LANDING
     if SWITCH == 1:
@@ -253,5 +249,7 @@ while not rospy.is_shutdown():
 
 
     print 'set_x',setpoint_x,'set_y',setpoint_y,'set_z',setpoint_z,'way_x',waypoint_x,'way_y', waypoint_y, 'tko_yaw', tko_yaw
+    print 'Tunning status, vaild_angle:', vaild_angle,'centric_distance', centric_distance,'waypoint_yaw',waypoint_yaw, 'Tunnel_V',TUNNEL_VAILD,'T_enable',TUNNING_ENABLE,'T_over', TUNNING_FINISHED,'back',BACK_ADJ
+
 
     rate.sleep()
