@@ -1,6 +1,8 @@
 <?xml version="1.0"?>
 <launch>
 
+
+
   	<!-- <arg name="PASSTHROUGH_ZMIN" default="0.2" /> -->
   	<arg name="PASSTHROUGH_ZMIN" default="0.2" />
   	<arg name="PASSTHROUGH_ZMAX" default="4.0" />
@@ -29,6 +31,12 @@
         <param name="RANSAC_DIS_THR" type="double" value="$(arg RANSAC_DIS_THR)" />
         <param name="RANSAC_VAILD_NUM" type="double" value="$(arg RANSAC_VAILD_NUM)" />
         <param name="VIZ" type="double" value="$(arg VIZ)" />
+    </node>
+
+    <node pkg="laser_filters" type="scan_to_scan_filter_chain"
+        name="laser_filter">
+        <rosparam command="load" file="$(find tunnel_estimator)/launch/scan_filter.yaml" />
+        <remap from="/scan" to="/laser/scan" />
     </node>
 
 </launch>
