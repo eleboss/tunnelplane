@@ -159,8 +159,10 @@ include_directories(include
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(scantocloud src/scantocloud.cpp)
 add_executable(pointprocess src/point_process.cpp)
-add_executable(scantocloud src/point_process.cpp)
+add_executable(scantocloud src/scantocloud.cpp)
 add_executable(nsector src/nsector.cpp)
+add_executable(estimator src/estimator.cpp)
+target_link_libraries(estimator ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 target_link_libraries(nsector ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 target_link_libraries(pointprocess ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 target_link_libraries(scantocloud ${Boost_LIBRARIES} ${catkin_LIBRARIES} ${PCL_LIBRARIES})

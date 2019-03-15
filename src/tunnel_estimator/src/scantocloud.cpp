@@ -23,7 +23,7 @@ public:
     laser_notifier_(laser_sub_,listener_, "rplidar_link", 10)  //use the lidar link name
   {
     laser_notifier_.registerCallback(
-      boost::bind(&LaserScanToPointCloud::scanCallback, this, _1));
+    boost::bind(&LaserScanToPointCloud::scanCallback, this, _1));
     laser_notifier_.setTolerance(ros::Duration(0.01));
     scan_pub_ = n_.advertise<sensor_msgs::PointCloud2>("rplidar/pointcloud",1);
   }
@@ -31,7 +31,6 @@ public:
   void scanCallback (const sensor_msgs::LaserScan::ConstPtr& scan_in)
   {
     sensor_msgs::PointCloud2 cloud;
-    sensor_msgs::PointCloud cloud_ori;
     try
     {
         projector_.transformLaserScanToPointCloud(
@@ -46,14 +45,14 @@ public:
     // Do something with cloud.
 
     scan_pub_.publish(cloud);
-
+    printf("I hear someting");
   }
 };
 
 int main(int argc, char** argv)
 {
   
-  ros::init(argc, argv, "scantocloud_node");
+  ros::init(argc, argv, "scantocloud");
   ros::NodeHandle n;
   LaserScanToPointCloud lstopc(n);
   

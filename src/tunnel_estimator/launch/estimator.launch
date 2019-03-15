@@ -6,8 +6,6 @@
         <!-- <remap from="/scan" to="/laser/scan" /> -->
     </node>
 
-    <node pkg="tunnel_estimator" type="scantocloud" name="stc" output="screen">
-    </node>
 
   	<!-- <arg name="PASSTHROUGH_ZMIN" default="0.2" /> -->
   	<arg name="PASSTHROUGH_ZMIN" default="0.2" />
@@ -20,11 +18,11 @@
   	<arg name="ROS_NER" default="1.0" />
   	<arg name="TUNNEL_WIDTH" default="5.0" />
   	<arg name="RANSAC_PLANE_ANG_TOR" default="0.01" />
-  	<arg name="RANSAC_DIS_THR" default="10.0" />
+  	<arg name="RANSAC_DIS_THR" default="0.05" />
   	<arg name="RANSAC_VAILD_NUM" default="20.0" />
     <arg name="VIZ" default="1.0" />
 
-    <node pkg="tunnel_estimator" type="nsector" name="tunnel" output="screen"> 
+    <node pkg="tunnel_estimator" type="estimator" name="tunnel" output="screen"> 
         <param name="PASSTHROUGH_ZMIN" type="double" value="$(arg PASSTHROUGH_ZMIN)" />
         <param name="PASSTHROUGH_ZMAX" type="double" value="$(arg PASSTHROUGH_ZMAX)" />
         <param name="FRONTFILTER_RAD" type="double" value="$(arg FRONTFILTER_RAD)" />
