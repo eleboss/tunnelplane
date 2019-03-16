@@ -109,7 +109,7 @@ rospy.init_node('drone_info')
 rc_in = rospy.Subscriber('mavros/rc/in', RCIn, callback_rc, queue_size=1)
 position_tag = rospy.Subscriber('apriltags/detections', AprilTagDetections, callback_tag, queue_size=1)
 subodom = rospy.Subscriber('mavros/local_position/odom', Odometry, callback_odom, queue_size=1)
-subtunnel = rospy.Subscriber('nsector/estimator', Odometry, callback_tunnel, queue_size=1)
+subtunnel = rospy.Subscriber('estimator/estimator', Odometry, callback_tunnel, queue_size=1)
 
 pub_droneinfo =  rospy.Publisher('drone_info', DroneInfo, queue_size=1)
 
@@ -131,7 +131,7 @@ while not rospy.is_shutdown():
     # if BACK_ADJ == 1 and pos_fuse_z > 0.1:
     if BACK_ADJ == 1:
         if TUNNING_ENABLE:
-            waypoint_yaw = odom_yaw - vaild_angle
+            waypoint_yaw = odom_yaw + vaild_angle
             TUNNING_ENABLE = 0
         if not TUNNING_FINISHED:
             setpoint_yaw = waypoint_yaw

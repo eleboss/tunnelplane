@@ -111,6 +111,12 @@ double two_vector_angle(Eigen::Vector3f vector1, Eigen::Vector3f vector2)
 {
   return acos((vector1.array() * vector2.array()).sum() / vector1.norm() * vector2.norm());
 }
+//return a signed area, that is the area of the parallelogram between the two vectors. 
+//meaning if v2 is in the left of v1 the crossproduct should return a positive number
+float CrossProduct2D(const Vector3f & v1, const Vector3f & v2)
+{
+  return (v1(0)*v2(1)) - (v1(1)*v2(0));
+}
 
 void callback_vins(const Odometry::ConstPtr &vins)
 {
@@ -142,7 +148,7 @@ void callback_scan(const LaserScan::ConstPtr &scan)
   //Convert scan point to pcl format
   PointCloudXYZ::Ptr scan_pcT (new PointCloudXYZ());
   pcl::fromROSMsg (scan_pc2, *scan_pcT);
-  // pub_trans_after.publish(scan_pcT);
+
 
   //创建旋转矩阵，这里的旋转的角度根据IMU给出
   Eigen::Affine3f transform = Eigen::Affine3f::Identity();
@@ -168,7 +174,7 @@ void callback_scan(const LaserScan::ConstPtr &scan)
   sor.filter (*scan_pcT_staf);
   // sor.setNegative (true);
   // sor.filter (*scan_pcT_sta_outliers);
-  // pub_trans_after.publish(scan_pcT_f);
+  pub_trans_after.publish(scan_pcT_staf);
   // pub_trans_outlier.publish(scan_pcT_outliers);
 
 
@@ -205,14 +211,14 @@ void callback_scan(const LaserScan::ConstPtr &scan)
     ransac_left.getInliers(inliers_left);
     ransac_left.getModelCoefficients (coeff_left);
     pcl::copyPointCloud<pcl::PointXYZ>(*scan_pcT_pass_left, inliers_left, *scan_pcT_rs_left);
-    ROS_INFO_STREAM(coeff_left);
+    // ROS_INFO_STREAM(coeff_left);
     line_vec_left(0) = coeff_left(3);
     line_vec_left(1) = coeff_left(4);
     line_vec_left(2) = coeff_left(5);
 
 
     //if the angle between vector(scan to point) and normal of plane are large than PI/2, we re direct the normal to point inside of the tunnel
-    if(two_vector_angle(vins_xyz.head(3), line_vec_left.head(3)) > 1.5707963)
+    if(two_vector_angle(drone_vector, line_vec_left.head(3)) > 1.5707963)
     {
       line_vec_left = - line_vec_left;
     }
@@ -237,14 +243,14 @@ void callback_scan(const LaserScan::ConstPtr &scan)
     ransac_right.getInliers(inliers_right);
     ransac_right.getModelCoefficients (coeff_right);
     pcl::copyPointCloud<pcl::PointXYZ>(*scan_pcT_pass_right, inliers_right, *scan_pcT_rs_right);
-    ROS_INFO_STREAM(coeff_right);
+    // ROS_INFO_STREAM(coeff_right);
     line_vec_right(0) = coeff_right(3);
     line_vec_right(1) = coeff_right(4);
     line_vec_right(2) = coeff_right(5);
 
 
     //if the angle between vector(scan to point) and normal of plane are large than PI/2, we re direct the normal to point inside of the tunnel
-    if(two_vector_angle(vins_xyz.head(3), line_vec_right.head(3)) > 1.5707963)
+    if(two_vector_angle(drone_vector, line_vec_right.head(3)) > 1.5707963)
     {
       line_vec_right.head(3) = - line_vec_right.head(3);
     }
@@ -264,7 +270,9 @@ void callback_scan(const LaserScan::ConstPtr &scan)
       pointinline_left(1) = coeff_left(1);
       pointinline_left(2) = coeff_left(2);
       //https://www.vitutor.com/geometry/distance/line_plane.html
-      angle_left = line_plane_angle(drone_vector, line_vec_left.head(3));
+      angle_left = two_vector_angle(drone_vector, line_vec_left.head(3));
+      if(CrossProduct2D(drone_vector, line_vec_left.head(3)) < 0)
+        angle_left = -angle_left;
       distance_left = pcl::sqrPointToLineDistance(vins_xyz,pointinline_left , line_vec_left);
       // ROS_INFO_STREAM("nor left"<<line_vec_left);
     }
@@ -274,7 +282,9 @@ void callback_scan(const LaserScan::ConstPtr &scan)
       pointinline_right(1) = coeff_right(1);
       pointinline_right(2) = coeff_right(2);
       //https://www.vitutor.com/geometry/distance/line_plane.html
-      angle_right = line_plane_angle(drone_vector, line_vec_right.head(3));
+      angle_right = two_vector_angle(drone_vector, line_vec_right.head(3));
+      if(CrossProduct2D(drone_vector, line_vec_right.head(3)) < 0)
+        angle_right = -angle_right;
       distance_right = pcl::sqrPointToLineDistance(vins_xyz,pointinline_left , line_vec_right);
       // ROS_INFO_STREAM("nor right"<<line_vec_right);
     }
@@ -329,14 +339,14 @@ int main(int argc, char **argv)
   ros::NodeHandle nh;
   ros::NodeHandle _nh("~"); // to get the private params
 
-  _nh.param("PASSTHROUGH_ZMIN", PASSTHROUGH_ZMIN, 0.2);
-  ROS_INFO_STREAM("Min height of pass through filter, used to filter the ground points to find the wall " << PASSTHROUGH_ZMIN);
+  // _nh.param("PASSTHROUGH_ZMIN", PASSTHROUGH_ZMIN, 0.2);
+  // ROS_INFO_STREAM("Min height of pass through filter, used to filter the ground points to find the wall " << PASSTHROUGH_ZMIN);
 
-  _nh.param("PASSTHROUGH_ZMAX", PASSTHROUGH_ZMAX, 4.0);
-  ROS_INFO_STREAM("Max height of pass through filter, used to filter the ground points to find the wall " << PASSTHROUGH_ZMAX);
+  // _nh.param("PASSTHROUGH_ZMAX", PASSTHROUGH_ZMAX, 4.0);
+  // ROS_INFO_STREAM("Max height of pass through filter, used to filter the ground points to find the wall " << PASSTHROUGH_ZMAX);
 
-  _nh.param("FRONTFILTER_RAD", FRONTFILTER_RAD, 4.0);
-  ROS_INFO_STREAM("Filter the front points, radius:" << FRONTFILTER_RAD<<" meter");
+  // _nh.param("FRONTFILTER_RAD", FRONTFILTER_RAD, 4.0);
+  // ROS_INFO_STREAM("Filter the front points, radius:" << FRONTFILTER_RAD<<" meter");
 
   _nh.param("STA_MEANK", STA_MEANK, 50.0);
   ROS_INFO_STREAM("statistics filter, compare with " << STA_MEANK<<" points");
@@ -344,11 +354,11 @@ int main(int argc, char **argv)
   _nh.param("STA_STD_THRESH", STA_STD_THRESH, 50.0);
   ROS_INFO_STREAM("std of statistics filter" << STA_STD_THRESH);
 
-  _nh.param("ROR_RAD", ROR_RAD, 0.5);
-  ROS_INFO_STREAM("RAD filter, Find points in " << ROR_RAD <<" meters");
+  // _nh.param("ROR_RAD", ROR_RAD, 0.5);
+  // ROS_INFO_STREAM("RAD filter, Find points in " << ROR_RAD <<" meters");
 
-  _nh.param("ROS_NER", ROS_NER, 1.0);
-  ROS_INFO_STREAM("RAF filter vaild point can find " << ROS_NER <<" neighboor in "<<ROR_RAD<<"meter");
+  // _nh.param("ROS_NER", ROS_NER, 1.0);
+  // ROS_INFO_STREAM("RAF filter vaild point can find " << ROS_NER <<" neighboor in "<<ROR_RAD<<"meter");
 
   _nh.param("TUNNEL_WIDTH", TUNNEL_WIDTH, 10.0);
   ROS_INFO_STREAM("We assume the tunnel is wider than " << TUNNEL_WIDTH <<"meter");
@@ -361,6 +371,12 @@ int main(int argc, char **argv)
 
   _nh.param("RANSAC_VAILD_NUM", RANSAC_VAILD_NUM, 30.0);
   ROS_INFO_STREAM("Vaild tunnel direction estimation needs at least " << RANSAC_VAILD_NUM <<"points");
+
+  _nh.param("VAILD_ANG_TOR", VAILD_ANG_TOR, 0.05);
+  ROS_INFO_STREAM("VAILD_ANG_TOR " << VAILD_ANG_TOR);
+
+  _nh.param("VAILD_DIS_TOR", VAILD_DIS_TOR, 10.0);
+  ROS_INFO_STREAM("VAILD_DIS_TOR " << VAILD_DIS_TOR);
 
   _nh.param("VIZ", VIZ, 0.0);
   ROS_INFO_STREAM("Visualize "<< VIZ);
@@ -384,7 +400,7 @@ int main(int argc, char **argv)
 
 
 
-    // ROS_INFO_STREAM(angle_left<<" "<<angle_right<<" "<<distance_right<<" "<<distance_left);
+    // ROS_INFO_STREAM(angle_left<<" "<<angle_right<<" "<<distance_right<<" "<<distance_left<<" "<<vins_yaw);
 
     ros::spinOnce();
     loop_rate.sleep();

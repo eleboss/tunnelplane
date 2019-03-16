@@ -8,32 +8,38 @@
 
 
   	<!-- <arg name="PASSTHROUGH_ZMIN" default="0.2" /> -->
-  	<arg name="PASSTHROUGH_ZMIN" default="0.2" />
-  	<arg name="PASSTHROUGH_ZMAX" default="4.0" />
-  	<arg name="FRONTFILTER_RAD" default="2.0" />
+  	<!-- <arg name="PASSTHROUGH_ZMIN" default="0.2" />
+  	<arg name="PASSTHROUGH_ZMAX" default="4.0" /> -->
+  	<!-- <arg name="FRONTFILTER_RAD" default="2.0" /> -->
   	<!-- <arg name="FRONTFILTER_RAD" default="0.0" /> -->
   	<arg name="STA_MEANK" default="50.0" />
   	<arg name="STA_STD_THRESH" default="50.0" />
-  	<arg name="ROR_RAD" default="0.5" />
-  	<arg name="ROS_NER" default="1.0" />
+  	<!-- <arg name="ROR_RAD" default="0.5" />
+  	<arg name="ROS_NER" default="1.0" /> -->
   	<arg name="TUNNEL_WIDTH" default="5.0" />
   	<arg name="RANSAC_PLANE_ANG_TOR" default="0.01" />
   	<arg name="RANSAC_DIS_THR" default="0.05" />
   	<arg name="RANSAC_VAILD_NUM" default="20.0" />
+  	<arg name="VAILD_ANG_TOR" default="0.05" />
+  	<arg name="VAILD_DIS_TOR" default="10.0" />
     <arg name="VIZ" default="1.0" />
 
+
+
     <node pkg="tunnel_estimator" type="estimator" name="tunnel" output="screen"> 
-        <param name="PASSTHROUGH_ZMIN" type="double" value="$(arg PASSTHROUGH_ZMIN)" />
-        <param name="PASSTHROUGH_ZMAX" type="double" value="$(arg PASSTHROUGH_ZMAX)" />
-        <param name="FRONTFILTER_RAD" type="double" value="$(arg FRONTFILTER_RAD)" />
+        <!-- <param name="PASSTHROUGH_ZMIN" type="double" value="$(arg PASSTHROUGH_ZMIN)" /> -->
+        <!-- <param name="PASSTHROUGH_ZMAX" type="double" value="$(arg PASSTHROUGH_ZMAX)" /> -->
+        <!-- <param name="FRONTFILTER_RAD" type="double" value="$(arg FRONTFILTER_RAD)" /> -->
         <param name="STA_MEANK" type="double" value="$(arg STA_MEANK)" />
         <param name="STA_STD_THRESH" type="double" value="$(arg STA_STD_THRESH)" />
-        <param name="ROR_RAD" type="double" value="$(arg ROR_RAD)" />
-        <param name="ROS_NER" type="double" value="$(arg ROS_NER)" />
+        <!-- <param name="ROR_RAD" type="double" value="$(arg ROR_RAD)" /> -->
+        <!-- <param name="ROS_NER" type="double" value="$(arg ROS_NER)" /> -->
         <param name="TUNNEL_WIDTH" type="double" value="$(arg TUNNEL_WIDTH)" />
         <param name="RANSAC_PLANE_ANG_TOR" type="double" value="$(arg RANSAC_PLANE_ANG_TOR)" />
         <param name="RANSAC_DIS_THR" type="double" value="$(arg RANSAC_DIS_THR)" />
         <param name="RANSAC_VAILD_NUM" type="double" value="$(arg RANSAC_VAILD_NUM)" />
+        <param name="VAILD_ANG_TOR" type="double" value="$(arg VAILD_ANG_TOR)" />
+        <param name="VAILD_DIS_TOR" type="double" value="$(arg VAILD_DIS_TOR)" />
         <param name="VIZ" type="double" value="$(arg VIZ)" />
     </node>
 
