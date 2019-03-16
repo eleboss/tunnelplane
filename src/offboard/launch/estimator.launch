@@ -2,7 +2,7 @@
 <launch>
 
 <!-- coornidate align system -->
-  <node pkg="offboard" type="pose_dog.py" name="pose_dog" output="screen"/>
+  <node pkg="offboard" type="pose_man.py" name="pose_man" output="screen"/>
 
 
 <!-- launch the vins -->

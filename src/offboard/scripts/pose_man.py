@@ -73,7 +73,7 @@ def callback_vins(vins):
         last_vins_z = vins_z
         last_vins_time = vins_time
 
-        print 'vins_x', vins_x, 'vins_y', vins_y, 'vins_z', vins_z, 'velx',vins_vel_x, 'vely',vins_vel_y, last_vins_x, last_vins_y
+        # print 'vins_x', vins_x, 'vins_y', vins_y, 'vins_z', vins_z, 'velx',vins_vel_x, 'vely',vins_vel_y, last_vins_x, last_vins_y
 
         # 超出移动范围直接判定数据无效，放着突然漂移导致的炸机
         if abs(vins_x) > MAX_RANGE or abs(vins_y) > MAX_RANGE:

@@ -118,8 +118,6 @@
   <param name="angle_compensate"    type="bool"   value="true"/>
   </node>
 
-  <!-- launch the point cloud process node -->
-  <!-- <node pkg="segmentation" type="pointprocess" name="pcp"  output="screen"/> -->
 
 <!-- launch the apriltags detection  -->
   <!-- <include file="$(find vins_estimator)/launch/usbcamera.launch"/> -->
