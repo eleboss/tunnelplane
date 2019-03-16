@@ -375,7 +375,7 @@ int main(int argc, char **argv)
   pub_trans_left = nh.advertise<PointCloudXYZ>("estimator/left", 1);
   pub_trans_right = nh.advertise<PointCloudXYZ>("estimator/right", 1);
 
-  pub_estimation = nh.advertise<Odometry>("estimator/estimator", 1);
+  pub_estimation = nh.advertise<Odometry> ("estimator/estimator", 1);
 
 
   ros::Rate loop_rate(20);
