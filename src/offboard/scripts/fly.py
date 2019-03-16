@@ -34,7 +34,7 @@ waypoint_yaw = 0
 TUNNING_ENABLE = 0
 TUNNING_FINISHED = 1
 
-MAX_FLY_RANGE = 8
+MAX_FLY_RANGE = 40
 
 waypoint_x = waypoint_y = 0
 
@@ -146,7 +146,7 @@ while not rospy.is_shutdown():
         if waypoint_x >= MAX_FLY_RANGE:
             pass
         else:
-            waypoint_x = waypoint_x + 0.005
+            waypoint_x = waypoint_x + 0.002
         waypoint_y = 0
 
         OUT = True
@@ -169,7 +169,7 @@ while not rospy.is_shutdown():
         feedback_mode = 0
 
         if waypoint_x >= 0:
-            waypoint_x = waypoint_x - 0.005
+            waypoint_x = waypoint_x - 0.002
         else:
             pass
 
