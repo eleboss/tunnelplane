@@ -146,7 +146,7 @@ while not rospy.is_shutdown():
         if waypoint_x >= MAX_FLY_RANGE:
             pass
         else:
-            waypoint_x = waypoint_x + 0.002
+            waypoint_x = 0.002
         waypoint_y = 0
 
         OUT = True
@@ -156,8 +156,8 @@ while not rospy.is_shutdown():
                             [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
         waypoint = np.dot(R_z_yaw, waypoint)
 
-        setpoint_x = waypoint[0][0] + tko_x
-        setpoint_y = waypoint[1][0] + tko_y
+        setpoint_x = setpoint_x + waypoint_x
+        setpoint_y = setpoint_y + waypoint_y
 
 
 
@@ -169,7 +169,7 @@ while not rospy.is_shutdown():
         feedback_mode = 0
 
         if waypoint_x >= 0:
-            waypoint_x = waypoint_x - 0.002
+            waypoint_x = - 0.002
         else:
             pass
 
@@ -183,15 +183,15 @@ while not rospy.is_shutdown():
 
         waypoint = np.dot(R_z_yaw, waypoint)
 
-        setpoint_x = waypoint[0][0] + tko_x
-        setpoint_y = waypoint[1][0] + tko_y
+        setpoint_x = setpoint_x + waypoint_x
+        setpoint_y = setpoint_y + waypoint_y
 
     if KNOB_L == 2:
         feedback_mode = 0
         if waypoint_y >= MAX_FLY_RANGE:
             pass
         else:
-            waypoint_y = waypoint_y + 0.0009
+            waypoint_y = 0.0009
         waypoint_x = 0
 
         OUT = True
@@ -201,15 +201,15 @@ while not rospy.is_shutdown():
                             [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
         waypoint = np.dot(R_z_yaw, waypoint)
 
-        setpoint_x = waypoint[0][0] + tko_x
-        setpoint_y = waypoint[1][0] + tko_y
+        setpoint_x = setpoint_x + waypoint_x
+        setpoint_y = setpoint_y + waypoint_y
     elif KNOB_L == 1:
         pass
     elif KNOB_L == 0:
         feedback_mode = 0
 
         if waypoint_y >= 0:
-            waypoint_y = waypoint_y - 0.0006
+            waypoint_y = -0.0006
         else:
             pass
 
@@ -223,11 +223,8 @@ while not rospy.is_shutdown():
 
         waypoint = np.dot(R_z_yaw, waypoint)
 
-        setpoint_x = waypoint[0][0] + tko_x
-        setpoint_y = waypoint[1][0] + tko_y
-
-
-
+        setpoint_x = setpoint_x + waypoint_x
+        setpoint_y = setpoint_y + waypoint_y
 
     if abs(setpoint_yaw - odom_yaw) < 0.03:
         TUNNING_FINISHED = 1
