@@ -156,9 +156,12 @@ while not rospy.is_shutdown():
                             [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
         waypoint = np.dot(R_z_yaw, waypoint)
 
+<<<<<<< HEAD
         waypoint_x = waypoint[0][0]
         waypoint_y = waypoint[1][0]
 
+=======
+>>>>>>> d87db51a2034f2d991eba699ef94686f8f83b47b
         setpoint_x = setpoint_x + waypoint_x
         setpoint_y = setpoint_y + waypoint_y
 
