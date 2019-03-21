@@ -1,0 +1,1 @@
+rosbag record /cam1/image_raw /cam0/image_raw /scan /mavros/distance_sensor/tfmini_pub /mavros/setpoint_raw/local /mavros/imu/data_raw /dvs/events

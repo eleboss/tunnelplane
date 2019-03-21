@@ -100,8 +100,8 @@ Vector4f line_vec_right(0, 0, 0, 1);
 Vector3f drone_vector(0,0,0);
 VectorXf coeff_right;
 VectorXf coeff_left;
-Vector4f pointinline_left(0,0,0,1);
-Vector4f pointinline_right(0,0,0,1);
+Vector4f pointinline_left(0,0,0,0);
+Vector4f pointinline_right(0,0,0,0);
 
 double line_plane_angle(Eigen::Vector3f line_vector, Eigen::Vector3f plane_norm)
 {
@@ -153,6 +153,9 @@ void callback_scan(const LaserScan::ConstPtr &scan)
   //创建旋转矩阵，这里的旋转的角度根据IMU给出
   Eigen::Affine3f transform = Eigen::Affine3f::Identity();
   // Define a translation
+  x_trans = vins_xyz(0);
+  y_trans = vins_xyz(1);
+  z_trans = vins_xyz(2);
   transform.translation() << x_trans, y_trans, z_trans;
   // The same rotation matrix as before; theta radians around Z axis
   transform.rotate(Eigen::AngleAxisf(vins_roll, Eigen::Vector3f::UnitX()));
@@ -273,7 +276,7 @@ void callback_scan(const LaserScan::ConstPtr &scan)
       angle_left = two_vector_angle(drone_vector, line_vec_left.head(3));
       if(CrossProduct2D(drone_vector, line_vec_left.head(3)) < 0)
         angle_left = -angle_left;
-      distance_left = pcl::sqrPointToLineDistance(vins_xyz,pointinline_left , line_vec_left);
+      distance_left = pcl::sqrPointToLineDistance(vins_xyz, pointinline_left, line_vec_left);
       // ROS_INFO_STREAM("nor left"<<line_vec_left);
     }
     if(RIGHT_VAILD)
@@ -285,7 +288,7 @@ void callback_scan(const LaserScan::ConstPtr &scan)
       angle_right = two_vector_angle(drone_vector, line_vec_right.head(3));
       if(CrossProduct2D(drone_vector, line_vec_right.head(3)) < 0)
         angle_right = -angle_right;
-      distance_right = pcl::sqrPointToLineDistance(vins_xyz,pointinline_left , line_vec_right);
+      distance_right = pcl::sqrPointToLineDistance(vins_xyz, pointinline_right, line_vec_right);
       // ROS_INFO_STREAM("nor right"<<line_vec_right);
     }
     if(LEFT_VAILD && RIGHT_VAILD)
@@ -296,9 +299,9 @@ void callback_scan(const LaserScan::ConstPtr &scan)
         {
           TUNNEL_VAILD = 1;
           vaild_angle = (angle_left + angle_right)/2;
-          centric_distance = distance_left - distance_right;
+          centric_distance = (distance_left - distance_right)/2;
           // ROS_INFO_STREAM(vaild_angle<<" "<< centric_distance);
-          ROS_INFO_STREAM("angle "<<vaild_angle<<" distance "<<centric_distance<<"left angle:"<<angle_left<<"right angle"<<angle_right);
+          ROS_INFO_STREAM("angle "<<vaild_angle<<" distance "<<centric_distance<<" distance_left "<<distance_left<<" distance_right "<<distance_right<<"left angle:"<<angle_left<<" right angle "<<angle_right);
         }
         else
         {
