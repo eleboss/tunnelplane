@@ -79,7 +79,7 @@
 
 <!-- launch the apriltags detection  -->
   <!-- <include file="$(find apriltags)/launch/usb_cam_apriltags.launch"/> -->
-  <node pkg="apriltags" type="apriltags" name="apriltags" output="screen">
+  <!-- <node pkg="apriltags" type="apriltags" name="apriltags" output="screen">
     <param name="~default_tag_size" value="0.160" />
 
     <param name="~viewer" value="false" />
@@ -104,7 +104,7 @@
     <remap from="~camera_info" to="cam0/camera_info"/>
     <remap from="~marker_array" to="apriltags/marker_array"/>
     <remap from="~detections" to="apriltags/detections"/>
-  </node>
+  </node> -->
 
   <node pkg="offboard" type="ekf_fixer.py" name="fix" output="screen">
   </node>
@@ -118,7 +118,7 @@
   <param name="angle_compensate"    type="bool"   value="true"/>
   </node>
 
-  <!-- <node pkg="celex4" type="cam_pub" name="dvs_v4" output="screen"/> -->
+  <node pkg="celex4" type="cam_pub" name="dvs_v4" output="screen"/>
 
 <!-- launch the apriltags detection  -->
   <!-- <include file="$(find vins_estimator)/launch/usbcamera.launch"/> -->

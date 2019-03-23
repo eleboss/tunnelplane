@@ -1,0 +1,6 @@
+rosparam set /cam0/image_raw/compressed/format png
+rosparam set /cam1/image_raw/compressed/format png
+rosparam set /cam0/image_raw/compressed/png_level 9
+rosparam set /cam1/image_raw/compressed/png_level 9
+
+rosbag record /cam0/image_raw/compressed /cam1/image_raw/compressed /scan /mavros/distance_sensor/tfmini_pub /mavros/setpoint_raw/local /mavros/imu/data_raw /dvs/events /dvs/imu

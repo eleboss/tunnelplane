@@ -26,7 +26,7 @@ SWITCH = 100
 detected_tags = 0
 feedback_mode = 0
 tko_x = tko_y = 0
-tko_z = 0.1
+tko_z = 0.7
 tko_yaw = 0
 
 centric_x = 0 
