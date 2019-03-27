@@ -51,7 +51,7 @@ search_direction = 1
 TAKEOFF_ENABLE = True
 
 OUT = False
-AUTO_ENABLE = False
+
 TAG_TkO_X = -2.56
 TAG_TkO_Y = -0.08
 
@@ -83,8 +83,6 @@ def callback_rc(rc):
         BACK_ADJ = 0
     # print 'SWITCH',SWITCH,'KNOB_L', KNOB_L,'KNOB_R', KNOB_R, 'BACK_ADJ',BACK_ADJ
 
-def l2_distance(x1,y1,x2,y2):
-    return np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
 def callback_tag(tag):
     global detected_tags
@@ -145,10 +143,10 @@ while not rospy.is_shutdown():
             #last adjustment is over
             # if abs(centric_set - centric_distance) < 0.05:
             #     SET_ONCE = 1
-            #adjust when last has finished and drift if larger than 5 cm.
-            if  abs(centric_distance) > 0.05:
-                centric_set = centric_distance
-                # SET_ONCE = 0
+            #adjust when last has finished and drift if larger than 10 cm.
+            if SET_ONCE and abs(centric_distance) > 0.1:
+                centric_set = centric_distance/5
+                SET_ONCE = 0
             TUNNING_ENABLE = 0
         else: 
             centric_set = 0
@@ -156,54 +154,76 @@ while not rospy.is_shutdown():
             setpoint_yaw = waypoint_yaw
 
     else:
-        # SET_ONCE = 1
+        SET_ONCE = 1
         centric_set = 0
 
-    #knob tunning left
     if KNOB_R == 2:
+
         feedback_mode = 0
-        AUTO_ENABLE = True
-        if l2_distance(setpoint_x,setpoint_y,pos_fuse_x,pos_fuse_y) < 0.03: 
-            waypoint_x = waypoint_x + 0.5
-            waypoint_y = 0
-    #knob tunning middle
+        if waypoint_x >= MAX_FLY_RANGE:
+            pass
+        else:
+            waypoint_x = 0.002
+        waypoint_y = 0
+
     elif KNOB_R == 1 :
-        feedback_mode = 0
-        AUTO_ENABLE = False
-    #knob tunning right, emergency slow moving mode
+        waypoint_x = 0
+        if OUT:
+            feedback_mode = 0
+            OUT = False
     elif KNOB_R == 0 :
         feedback_mode = 0
-        AUTO_ENABLE = False
-        setpoint_x = pos_fuse_x
-        setpoint_y = pos_fuse_y
+
+        if waypoint_x >= 0:
+            waypoint_x = - 0.002
+        else:
+            pass
+
+        waypoint_y = 0
         OUT = True
 
     if KNOB_L == 2:
-        pass
+        feedback_mode = 0
+        if waypoint_y >= MAX_FLY_RANGE:
+            pass
+        else:
+            waypoint_y = 0.0006
+        waypoint_x = 0
+
+        OUT = True
+
     elif KNOB_L == 1:
-        pass
+        waypoint_y = 0
+
     elif KNOB_L == 0:
-        pass
+        feedback_mode = 0
+
+        if waypoint_y <= MAX_FLY_RANGE:
+            waypoint_y = -0.0006
+        else:
+            pass
+
+        waypoint_x = 0
+        OUT = True
 
     #Trans to init yaw direction
-    if AUTO_ENABLE:
-        waypoint = np.array([waypoint_x, waypoint_y]).reshape(2, 1)
-        centric = np.array([0, -centric_set]).reshape(2, 1)
+    waypoint = np.array([waypoint_x, waypoint_y]).reshape(2, 1)
+    centric = np.array([0, -centric_set]).reshape(2, 1)
 
-        R_z_yaw = np.array([[np.cos(waypoint_yaw), -np.sin(waypoint_yaw)],
-                            [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
+    R_z_yaw = np.array([[np.cos(waypoint_yaw), -np.sin(waypoint_yaw)],
+                        [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
 
-        waypoint = np.dot(R_z_yaw, waypoint)
-        centric = np.dot(R_z_yaw, centric)
+    waypoint = np.dot(R_z_yaw, waypoint)
+    centric = np.dot(R_z_yaw, centric)
 
-        waypoint_x = waypoint[0][0]
-        waypoint_y = waypoint[1][0]
+    waypoint_x = waypoint[0][0]
+    waypoint_y = waypoint[1][0]
 
-        centric_x = centric[0][0]
-        centric_y = centric[1][0]
+    centric_x = centric[0][0]
+    centric_y = centric[1][0]
 
-        setpoint_x = tko_x + waypoint_x + centric_x
-        setpoint_y = tko_y + waypoint_y + centric_y
+    setpoint_x = setpoint_x + waypoint_x + centric_x
+    setpoint_y = setpoint_y + waypoint_y + centric_y
 
     if abs(setpoint_yaw - odom_yaw) < YAW_ADJ_TOR:
         TUNNING_FINISHED = 1

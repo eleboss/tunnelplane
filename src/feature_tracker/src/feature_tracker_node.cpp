@@ -25,32 +25,42 @@ bool first_image_flag = true;
 double last_image_time = 0;
 bool init_pub = 0;
 
+int last_frame = 0;
+int cur_frame = 0;
+
 void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
-    if(first_image_flag)
+
+    ROS_INFO("%d",img_msg->header.seq);
+    cur_frame = img_msg->header.seq;
+    if (last_frame - cur_frame >1 and last_frame != 0)    
+        ROS_WARN("Warning, dropping frame");
+
+    if(first_image_flag)//第一帧用于初始化
     {
         first_image_flag = false;
         first_image_time = img_msg->header.stamp.toSec();
         last_image_time = img_msg->header.stamp.toSec();
-        return;
+        return;//return是个好方法
     }
-    // detect unstable camera stream
+    // detect unstable camera stream//循环将当前时间和前一帧时间进行比较，如果超过约束值就重新初始化，图像帧率远应该大于1HZ
     if (img_msg->header.stamp.toSec() - last_image_time > 1.0 || img_msg->header.stamp.toSec() < last_image_time)
     {
         ROS_WARN("image discontinue! reset the feature tracker!");
-        first_image_flag = true; 
+        first_image_flag = true; //重新初始化第一帧
         last_image_time = 0;
         pub_count = 1;
         std_msgs::Bool restart_flag;
         restart_flag.data = true;
-        pub_restart.publish(restart_flag);
+        pub_restart.publish(restart_flag);//发布一个restart标志
         return;
     }
     last_image_time = img_msg->header.stamp.toSec();
-    // frequency control
+    last_frame = cur_frame;
+    // frequency control round取整，
     if (round(1.0 * pub_count / (img_msg->header.stamp.toSec() - first_image_time)) <= FREQ)
     {
-        PUB_THIS_FRAME = true;
+        PUB_THIS_FRAME = true;//开发布开关
         // reset the frequency control
         if (abs(1.0 * pub_count / (img_msg->header.stamp.toSec() - first_image_time) - FREQ) < 0.01 * FREQ)
         {
@@ -60,7 +70,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
     }
     else
         PUB_THIS_FRAME = false;
-
+    //收图像，用cvbridge转换成灰度图（mono8）
     cv_bridge::CvImageConstPtr ptr;
     if (img_msg->encoding == "8UC1")
     {
@@ -77,13 +87,18 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
     else
         ptr = cv_bridge::toCvCopy(img_msg, sensor_msgs::image_encodings::MONO8);
 
+    // cv::resize(ptr->image,ptr->image,cv::Size(640,480));
+
     cv::Mat show_img = ptr->image;
-    TicToc t_r;
-    for (int i = 0; i < NUM_OF_CAM; i++)
+
+
+    
+    TicToc t_r;//计时开始
+    for (int i = 0; i < NUM_OF_CAM; i++)//目前只有一个相机
     {
         ROS_DEBUG("processing camera %d", i);
-        if (i != 1 || !STEREO_TRACK)
-            trackerData[i].readImage(ptr->image.rowRange(ROW * i, ROW * (i + 1)), img_msg->header.stamp.toSec());
+        if (i != 1 || !STEREO_TRACK)// ROW is image height//ptr->image.rowRange(ROW * i, ROW * (i + 1))就是图像本身，rowRange(0,ROW)表示从0到row
+            trackerData[i].readImage(ptr->image.rowRange(ROW * i, ROW * (i + 1)), img_msg->header.stamp.toSec());//多目视觉的时候i可以代表相机，单目
         else
         {
             if (EQUALIZE)
@@ -99,7 +114,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
         trackerData[i].showUndistortion("undistrotion_" + std::to_string(i));
 #endif
     }
-
+    //更新相机ID，当前只有一个相机，所以id为0
     for (unsigned int i = 0;; i++)
     {
         bool completed = false;
@@ -110,9 +125,9 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
             break;
     }
 
-   if (PUB_THIS_FRAME)
+   if (PUB_THIS_FRAME)//发布帧 点云
    {
-        pub_count++;
+        pub_count++;//count+1用于控制频率
         sensor_msgs::PointCloudPtr feature_points(new sensor_msgs::PointCloud);
         sensor_msgs::ChannelFloat32 id_of_point;
         sensor_msgs::ChannelFloat32 u_of_point;
@@ -178,7 +193,7 @@ void img_callback(const sensor_msgs::ImageConstPtr &img_msg)
                 for (unsigned int j = 0; j < trackerData[i].cur_pts.size(); j++)
                 {
                     double len = std::min(1.0, 1.0 * trackerData[i].track_cnt[j] / WINDOW_SIZE);
-                    cv::circle(tmp_img, trackerData[i].cur_pts[j], 2, cv::Scalar(255 * (1 - len), 0, 255 * len), 2);
+                    cv::circle(tmp_img, trackerData[i].cur_pts[j], 2, cv::Scalar(255 * (1 - len), 0, 255 * len), 20);
                     //draw speed line
                     /*
                     Vector2d tmp_cur_un_pts (trackerData[i].cur_un_pts[j].x, trackerData[i].cur_un_pts[j].y);
@@ -210,6 +225,7 @@ int main(int argc, char **argv)
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
     readParameters(n);
 
+
     for (int i = 0; i < NUM_OF_CAM; i++)
         trackerData[i].readIntrinsicParameter(CAM_NAMES[i]);
 
@@ -230,9 +246,9 @@ int main(int argc, char **argv)
 
     ros::Subscriber sub_img = n.subscribe(IMAGE_TOPIC, 100, img_callback);
 
-    pub_img = n.advertise<sensor_msgs::PointCloud>("feature", 1000);
-    pub_match = n.advertise<sensor_msgs::Image>("feature_img",1000);
-    pub_restart = n.advertise<std_msgs::Bool>("restart",1000);
+    pub_img = n.advertise<sensor_msgs::PointCloud>("feature", 1000);//用于后端优化
+    pub_match = n.advertise<sensor_msgs::Image>("feature_img",1000);//用于调试
+    pub_restart = n.advertise<std_msgs::Bool>("restart",1000);//复位信号
     /*
     if (SHOW_TRACK)
         cv::namedWindow("vis", cv::WINDOW_NORMAL);

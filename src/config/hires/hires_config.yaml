@@ -2,30 +2,29 @@
 
 #common parameters
 imu_topic: "/mavros/imu/data_raw"
-image_topic: "/cam0/image_raw"
-output_path: "/home/ubuntu/output"
+image_topic: "/cam1/image_raw"
+output_path: "/home/eleboss/output"
 
 #camera calibration 
 model_type: PINHOLE
 camera_name: camera
-image_width: 640
-image_height: 400
+image_width: 2448
+image_height: 2048
 
 distortion_parameters:
-   k1: 0.1181899068455172
-   k2: -0.1499634537873247
-   p1: 0.0006390062302110907
-   p2: 0.00017343000584484476
+   k1: 0.17578044434429085
+   k2: 0.27715818467440745 
+   p1: -1.2361053129650326
+   p2: 2.5889499693456615
 
 projection_parameters:
-   fx: 391.8642746752506
-   fy: 391.5774139021231
-   cx: 302.5668317187981
-   cy: 229.88499996942573
-
+   fx: 2493.064892160006
+   fy: 2508.7178616905153
+   cx: 1248.7586785523065
+   cy: 1021.7255384858784
 
 # Extrinsic parameter between IMU and Camera.
-estimate_extrinsic: 1   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't change it.
+estimate_extrinsic: 0   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't change it.
                         # 1  Have an initial guess about extrinsic parameters. We will optimize around your initial guess.
                         # 2  Don't know anything about extrinsic parameters. You don't need to give R,T. We will try to calibrate it. Do some rotation movement at beginning.                        
 #If you choose 0 or 1, you should write down the following matrix.
@@ -34,23 +33,23 @@ extrinsicRotation: !!opencv-matrix
    rows: 3
    cols: 3
    dt: d
-   data:  [  0.0250895,   0.03080334,  0.99921052,
-            -0.9996522, -0.00734553,  0.02532704,
-            0.00811989, -0.99949847,  0.03060834 ]
+   data:  [  0.04854572,   -0.99653383,  0.06755475,
+            -0.01507169, -0.06835764,   -0.99754703,
+            0.99870724, 0.04740847,     -0.01833792]
 
 #Translation from camera frame to imu frame, imu^T_cam
 extrinsicTranslation: !!opencv-matrix
    rows: 3
    cols: 1
    dt: d
-   data: [0.05209584,  0.013209388045, 0.0215541836211]
+   data: [-0.0145458,  0.07753995, -0.11644081]
 
 
 
 #feature traker paprameters
 max_cnt: 150            # max feature number in feature tracking
 min_dist: 25            # min distance between two features 
-freq: 10               # frequence (Hz) of publish tracking result. At least 10Hz for good estimation. If set 0, the frequence will be same as raw image 
+freq: 20               # frequence (Hz) of publish tracking result. At least 10Hz for good estimation. If set 0, the frequence will be same as raw image 
 F_threshold: 1.0        # ransac threshold (pixel)
 show_track: 1           # publish tracking image as topic
 equalize: 1             # if image is too dark or light, trun on equalize to find enough features
@@ -72,11 +71,11 @@ g_norm: 9.805       # gravity magnitude
 loop_closure: 1                     # start loop closure
 fast_relocalization: 1             # useful in real-time and large project
 load_previous_pose_graph: 0        # load and reuse previous pose graph; load from 'pose_graph_save_path'
-pose_graph_save_path: "/home/ubuntu/output/pose_graph/" # save and load path
+pose_graph_save_path: "/home/eleboss/output/pose_graph/" # save and load path
 
 #unsynchronization parameters
 estimate_td: 1                      # online estimate time offset between camera and imu
-td: -0.010899                           # initial value of time offset. unit: s. readed image clock + td = real image clock (IMU clock)
+td: -0.04135991768079266                           # initial value of time offset. unit: s. readed image clock + td = real image clock (IMU clock)
 
 #rolling shutter parameters
 rolling_shutter: 0                      # 0: global shutter camera, 1: rolling shutter camera
