@@ -90,6 +90,7 @@ ros::Publisher pub_estimation;
 laser_geometry::LaserProjection projector_;
 
 double angle_left, angle_right, distance_left, distance_right;
+double odom_pitch,odom_yaw,odom_roll;
 
 double vins_pitch, vins_roll, vins_yaw;
 Vector4f vins_xyz(0,0,0,1);
@@ -116,6 +117,13 @@ double two_vector_angle(Eigen::Vector3f vector1, Eigen::Vector3f vector2)
 float CrossProduct2D(const Vector3f & v1, const Vector3f & v2)
 {
   return (v1(0)*v2(1)) - (v1(1)*v2(0));
+}
+
+void callback_odom(const Odometry::ConstPtr &odom)
+{
+    tf::Quaternion odom_qn(odom->pose.pose.orientation.x, odom->pose.pose.orientation.y, odom->pose.pose.orientation.z, odom->pose.pose.orientation.w);
+    tf::Matrix3x3 m(odom_qn);
+    m.getRPY(odom_roll, odom_pitch, odom_yaw);
 }
 
 void callback_vins(const Odometry::ConstPtr &vins)
@@ -276,7 +284,7 @@ void callback_scan(const LaserScan::ConstPtr &scan)
       angle_left = two_vector_angle(drone_vector, line_vec_left.head(3));
       if(CrossProduct2D(drone_vector, line_vec_left.head(3)) < 0)
         angle_left = -angle_left;
-      distance_left = pcl::sqrPointToLineDistance(vins_xyz, pointinline_left, line_vec_left);
+      distance_left = pcl::sqrPointToLineDistance(vins_xyz, pointinline_left, line_vec_left) * cos(odom_roll);
       // ROS_INFO_STREAM("nor left"<<line_vec_left);
     }
     if(RIGHT_VAILD)
@@ -288,7 +296,7 @@ void callback_scan(const LaserScan::ConstPtr &scan)
       angle_right = two_vector_angle(drone_vector, line_vec_right.head(3));
       if(CrossProduct2D(drone_vector, line_vec_right.head(3)) < 0)
         angle_right = -angle_right;
-      distance_right = pcl::sqrPointToLineDistance(vins_xyz, pointinline_right, line_vec_right);
+      distance_right = pcl::sqrPointToLineDistance(vins_xyz, pointinline_right, line_vec_right) * cos(odom_roll);
       // ROS_INFO_STREAM("nor right"<<line_vec_right);
     }
     if(LEFT_VAILD && RIGHT_VAILD)
@@ -386,6 +394,7 @@ int main(int argc, char **argv)
 
   ros::Subscriber sub = nh.subscribe<PointCloud>("vins_estimator/point_cloud", 1, callback_pc);
   ros::Subscriber sub_vins = nh.subscribe<Odometry>("vins_estimator/odometry", 1, callback_vins);
+  ros::Subscriber sub_odom = nh.subscribe<Odometry>("/mavros/local_position/odom", 1, callback_odom);
   ros::Subscriber sub_scan = nh.subscribe<LaserScan>("scan_filtered", 1, callback_scan);
 
   // pub_trans = nh.advertise<PointCloudXYZ>("estimator/est", 1);

@@ -26,7 +26,7 @@ SWITCH = 100
 detected_tags = 0
 feedback_mode = 0
 tko_x = tko_y = 0
-tko_z = 0.7
+tko_z = 0.1
 tko_yaw = 0
 
 centric_x = 0 
@@ -39,8 +39,8 @@ waypoint_yaw = 0
 TUNNING_ENABLE = 0
 TUNNING_FINISHED = 1
 
-YAW_ADJ_TOR = 0.05 #if new angle is not bigger than this value, the drone will not adjust itself.
-MAX_FLY_RANGE = 40
+YAW_ADJ_TOR = 0.1 #if new angle is not bigger than this value, the drone will not adjust itself.
+MAX_FLY_RANGE = 5
 
 waypoint_x = waypoint_y = 0
 
@@ -140,32 +140,29 @@ while not rospy.is_shutdown():
     if BACK_ADJ == 1:
         if TUNNING_ENABLE:
             #not adjust the yaw if drift is too small
-            if vaild_angle > 0.03:
+            if abs(vaild_angle) > 0.1:
                 waypoint_yaw = odom_yaw + vaild_angle
-            #last adjustment is over
-            # if abs(centric_set - centric_distance) < 0.05:
-            #     SET_ONCE = 1
+            
             #adjust when last has finished and drift if larger than 5 cm.
             if  abs(centric_distance) > 0.05:
                 centric_set = centric_distance
-                # SET_ONCE = 0
+
             TUNNING_ENABLE = 0
         else: 
-            centric_set = 0
+            pass
+            # centric_set = 0
         if not TUNNING_FINISHED:
             setpoint_yaw = waypoint_yaw
 
     else:
         # SET_ONCE = 1
-        centric_set = 0
+        # centric_set = 0
+        pass
 
     #knob tunning left
     if KNOB_R == 2:
         feedback_mode = 0
         AUTO_ENABLE = True
-        if l2_distance(setpoint_x,setpoint_y,pos_fuse_x,pos_fuse_y) < 0.03: 
-            waypoint_x = waypoint_x + 0.5
-            waypoint_y = 0
     #knob tunning middle
     elif KNOB_R == 1 :
         feedback_mode = 0
@@ -179,11 +176,17 @@ while not rospy.is_shutdown():
         OUT = True
 
     if KNOB_L == 2:
-        pass
+        if setpoint_x < MAX_FLY_RANGE and AUTO_ENABLE:
+            if l2_distance(setpoint_x,setpoint_y,pos_fuse_x,pos_fuse_y) < 0.1: 
+                waypoint_x = waypoint_x + 1
+                waypoint_y = 0
     elif KNOB_L == 1:
         pass
     elif KNOB_L == 0:
-        pass
+        if setpoint_x < MAX_FLY_RANGE and AUTO_ENABLE :
+            if l2_distance(setpoint_x,setpoint_y,pos_fuse_x,pos_fuse_y) < 0.1: 
+                waypoint_x = waypoint_x - 1
+                waypoint_y = 0
 
     #Trans to init yaw direction
     if AUTO_ENABLE:
@@ -196,16 +199,12 @@ while not rospy.is_shutdown():
         waypoint = np.dot(R_z_yaw, waypoint)
         centric = np.dot(R_z_yaw, centric)
 
-        waypoint_x = waypoint[0][0]
-        waypoint_y = waypoint[1][0]
+        setpoint_x = tko_x + waypoint[0][0] + centric[0][0]
+        setpoint_y = tko_y + waypoint[1][0] + centric[1][0]
+        # setpoint_x = tko_x  + centric_x
+        # setpoint_y = tko_y  + centric_y
 
-        centric_x = centric[0][0]
-        centric_y = centric[1][0]
-
-        setpoint_x = tko_x + waypoint_x + centric_x
-        setpoint_y = tko_y + waypoint_y + centric_y
-
-    if abs(setpoint_yaw - odom_yaw) < YAW_ADJ_TOR:
+    if abs(waypoint_yaw - odom_yaw) < YAW_ADJ_TOR:
         TUNNING_FINISHED = 1
     else:
         TUNNING_FINISHED = 0
@@ -225,7 +224,7 @@ while not rospy.is_shutdown():
 
 
     print 'set_x',setpoint_x,'set_y',setpoint_y,'set_z',setpoint_z,'way_x',waypoint_x,'way_y', waypoint_y, 'tko_yaw', tko_yaw, 'odom_x', pos_fuse_x,'odom_y',pos_fuse_y
-    print 'Tunning status, vaild_angle:', vaild_angle,'centric_distance ', centric_distance,'waypoint_yaw ',waypoint_yaw,' centric_set ',centric_set
+    print 'vaild_angle:', vaild_angle,'centric_distance ', centric_distance,' centric_set ',centric_set,'waypoint_yaw ',waypoint_yaw,'odom_yaw',odom_yaw
     print 'Tunnel_V',TUNNEL_VAILD,'T_enable ',TUNNING_ENABLE,'T_over ', TUNNING_FINISHED,'back ',BACK_ADJ,'SET_ONCE ',SET_ONCE
 
 

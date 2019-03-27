@@ -118,7 +118,7 @@
   <param name="angle_compensate"    type="bool"   value="true"/>
   </node>
 
-  <node pkg="celex4" type="cam_pub" name="dvs_v4" output="screen"/>
+  <!-- <node pkg="celex4" type="cam_pub" name="dvs_v4" output="screen"/> -->
 
 <!-- launch the apriltags detection  -->
   <!-- <include file="$(find vins_estimator)/launch/usbcamera.launch"/> -->
