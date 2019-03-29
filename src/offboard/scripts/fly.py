@@ -26,7 +26,7 @@ SWITCH = 100
 detected_tags = 0
 feedback_mode = 0
 tko_x = tko_y = 0
-tko_z = 0.1
+tko_z = 0.65
 tko_yaw = 0
 
 centric_x = 0 
@@ -39,8 +39,9 @@ waypoint_yaw = 0
 TUNNING_ENABLE = 0
 TUNNING_FINISHED = 1
 
+ANGLE_DRIFT_THR = 0.1
 YAW_ADJ_TOR = 0.1 #if new angle is not bigger than this value, the drone will not adjust itself.
-MAX_FLY_RANGE = 5
+MAX_FLY_RANGE = 100
 
 waypoint_x = waypoint_y = 0
 
@@ -55,6 +56,8 @@ AUTO_ENABLE = False
 TAG_TkO_X = -2.56
 TAG_TkO_Y = -0.08
 
+d_waypoint_x = 0  #along the tunnel direction
+d_waypoint_y = 0
 
 def callback_rc(rc):
     global SWITCH, KNOB_L, KNOB_R, BACK_ADJ
@@ -140,12 +143,14 @@ while not rospy.is_shutdown():
     if BACK_ADJ == 1:
         if TUNNING_ENABLE:
             #not adjust the yaw if drift is too small
-            if abs(vaild_angle) > 0.1:
+            if abs(vaild_angle) > ANGLE_DRIFT_THR:
                 waypoint_yaw = odom_yaw + vaild_angle
             
             #adjust when last has finished and drift if larger than 5 cm.
-            if  abs(centric_distance) > 0.05:
-                centric_set = centric_distance
+            if  abs(centric_distance) > 0.2:
+                centric_set = centric_distance * 0.8
+            else:
+                centric_set = 0
 
             TUNNING_ENABLE = 0
         else: 
@@ -155,7 +160,6 @@ while not rospy.is_shutdown():
             setpoint_yaw = waypoint_yaw
 
     else:
-        # SET_ONCE = 1
         # centric_set = 0
         pass
 
@@ -175,34 +179,68 @@ while not rospy.is_shutdown():
         setpoint_y = pos_fuse_y
         OUT = True
 
+
+
+
     if KNOB_L == 2:
+        #using dx dy to avoid tunnel cruve influence
         if setpoint_x < MAX_FLY_RANGE and AUTO_ENABLE:
-            if l2_distance(setpoint_x,setpoint_y,pos_fuse_x,pos_fuse_y) < 0.1: 
-                waypoint_x = waypoint_x + 1
-                waypoint_y = 0
+            #forward
+            if l2_distance(setpoint_x,setpoint_y,pos_fuse_x,pos_fuse_y) < 0.04: 
+                d_waypoint_x = 4
+                d_waypoint_y = 0
+
+                #Trans to init yaw direction
+                #calculate the distance to the center point of tunnel after the movement
+                # centric_set = centric_set - (np.sqrt(d_waypoint_x **2 +d_waypoint_y **2) * np.sin(vaild_angle))
+
+                d_waypoint = np.array([d_waypoint_x, d_waypoint_y]).reshape(2, 1)
+                centric = np.array([0, -centric_set]).reshape(2, 1)
+
+                R_tunnel_ned = np.array([[np.cos(waypoint_yaw), -np.sin(waypoint_yaw)],
+                                    [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
+
+                d_waypoint = np.dot(R_tunnel_ned, d_waypoint)
+                centric = np.dot(R_tunnel_ned, centric)
+
+                waypoint_x = waypoint_x + d_waypoint[0][0]
+                waypoint_y = waypoint_y + d_waypoint[1][0]
+
+                waypoint_x = waypoint_x + centric[0][0]
+                waypoint_y = waypoint_y + centric[1][0]
+
     elif KNOB_L == 1:
         pass
     elif KNOB_L == 0:
         if setpoint_x < MAX_FLY_RANGE and AUTO_ENABLE :
-            if l2_distance(setpoint_x,setpoint_y,pos_fuse_x,pos_fuse_y) < 0.1: 
-                waypoint_x = waypoint_x - 1
-                waypoint_y = 0
+            #backward
+            if l2_distance(setpoint_x,setpoint_y,pos_fuse_x,pos_fuse_y) < 0.04:
+                d_waypoint_x = -1
+                d_waypoint_y = 0 
 
-    #Trans to init yaw direction
+                #Trans to init yaw direction
+                #calculate the distance to the center point of tunnel after the movement,moving backward, so is 180 mines vaild_angle 
+                # centric_set = centric_set - (np.sqrt(d_waypoint_x **2 +d_waypoint_y **2) * np.sin(np.pi - vaild_angle))
+
+                d_waypoint = np.array([d_waypoint_x, d_waypoint_y]).reshape(2, 1)
+                centric = np.array([0, -centric_set]).reshape(2, 1)
+
+                R_tunnel_ned = np.array([[np.cos(waypoint_yaw), -np.sin(waypoint_yaw)],
+                                    [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
+
+                d_waypoint = np.dot(R_tunnel_ned, d_waypoint)
+                centric = np.dot(R_tunnel_ned, centric)
+
+                waypoint_x = waypoint_x + d_waypoint[0][0]
+                waypoint_y = waypoint_y + d_waypoint[1][0]
+
+                waypoint_x = waypoint_x + centric[0][0]
+                waypoint_y = waypoint_y + centric[1][0]
+
     if AUTO_ENABLE:
-        waypoint = np.array([waypoint_x, waypoint_y]).reshape(2, 1)
-        centric = np.array([0, -centric_set]).reshape(2, 1)
+        setpoint_x = tko_x + waypoint_x 
+        setpoint_y = tko_y + waypoint_y 
 
-        R_z_yaw = np.array([[np.cos(waypoint_yaw), -np.sin(waypoint_yaw)],
-                            [np.sin(waypoint_yaw), np.cos(waypoint_yaw)]])
-
-        waypoint = np.dot(R_z_yaw, waypoint)
-        centric = np.dot(R_z_yaw, centric)
-
-        setpoint_x = tko_x + waypoint[0][0] + centric[0][0]
-        setpoint_y = tko_y + waypoint[1][0] + centric[1][0]
-        # setpoint_x = tko_x  + centric_x
-        # setpoint_y = tko_y  + centric_y
 
     if abs(waypoint_yaw - odom_yaw) < YAW_ADJ_TOR:
         TUNNING_FINISHED = 1

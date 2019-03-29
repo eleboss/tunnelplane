@@ -16,12 +16,12 @@
   	<arg name="STA_STD_THRESH" default="50.0" />
   	<!-- <arg name="ROR_RAD" default="0.5" />
   	<arg name="ROS_NER" default="1.0" /> -->
-  	<arg name="TUNNEL_WIDTH" default="5.0" />
+  	<arg name="TUNNEL_WIDTH" default="5" />
   	<arg name="RANSAC_PLANE_ANG_TOR" default="0.01" />
   	<arg name="RANSAC_DIS_THR" default="0.05" />
   	<arg name="RANSAC_VAILD_NUM" default="20.0" />
   	<arg name="VAILD_ANG_TOR" default="0.05" />
-  	<arg name="VAILD_DIS_TOR" default="10.0" />
+  	<arg name="VAILD_DIS_TOR" default="10" />
     <arg name="VIZ" default="1.0" />
 
 
