@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-with open('./fly.txt', 'r') as f:
+with open('./3611.txt', 'r') as f:
     lines = f.readlines()
 jumper = 0
 yaw, pitch, roll = [], [], []
@@ -97,7 +97,7 @@ t = np.arange(0, np.shape(x)[0])
 
 
 
-plt.figure(figsize=(30,30.5))
+plt.figure(figsize=(20,20.5))
 plt.subplot(811)
 plt.plot(t, roll[:])
 plt.ylabel("Roll (rad)") 
@@ -124,17 +124,17 @@ plt.ylabel("Z Position (m)")
 plt.subplot(816)
 plt.plot(t, vx[:])
 plt.plot(t, svx[:])
-plt.ylabel("Z Position (m)") 
+plt.ylabel("X Velocity (m)") 
 
 plt.subplot(817)
 plt.plot(t, vy[:])
 plt.plot(t, svy[:])
-plt.ylabel("Z Position (m)") 
+plt.ylabel("Y Velocity (m)") 
 
 plt.subplot(818)
 plt.plot(t, vz[:])
 plt.plot(t, svz[:])
-plt.ylabel("Z Position (m)") 
+plt.ylabel("Z Velocity (m)") 
 
 
 plt.xlabel("Time (Sec)") 

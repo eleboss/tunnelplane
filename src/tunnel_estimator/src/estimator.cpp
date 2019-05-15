@@ -234,7 +234,9 @@ void callback_scan(const LaserScan::ConstPtr &scan)
       line_vec_left = - line_vec_left;
     }
     if(VIZ)
+      scan_pcT_rs_left->header.frame_id = "world";
       pub_trans_left.publish(scan_pcT_rs_left);
+      
   }
   else
   {
@@ -266,6 +268,7 @@ void callback_scan(const LaserScan::ConstPtr &scan)
       line_vec_right.head(3) = - line_vec_right.head(3);
     }
     if(VIZ)
+      scan_pcT_rs_right->header.frame_id = "world";
       pub_trans_right.publish(scan_pcT_rs_right);
   }
   else
